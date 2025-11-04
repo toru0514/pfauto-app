@@ -1,4 +1,7 @@
+import { config } from "dotenv";
 import { google } from "googleapis";
+
+config({ path: ".env.local" });
 
 async function main() {
   const base64 = process.env.GOOGLE_SERVICE_ACCOUNT_BASE64;

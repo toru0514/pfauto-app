@@ -442,7 +442,7 @@ ADMIN_PASSWORD=<strong password>
 - [x] NextAuth.js（Credentials Provider）を導入し、`.env.local` に `ADMIN_EMAIL` / `ADMIN_PASSWORD` を設定する。
 - [x] `.env.example` を更新し、必要な環境変数（Google Sheets / Playwright 等）を共有する。
 - [x] Service Account を発行し、対象 Spreadsheet へのアクセス権を付与する。
-- [ ] `GOOGLE_SERVICE_ACCOUNT_BASE64` / `GOOGLE_SHEETS_SPREADSHEET_ID` を設定し、読み書きの PoC を実施する。
+- [x] `GOOGLE_SERVICE_ACCOUNT_BASE64` / `GOOGLE_SHEETS_SPREADSHEET_ID` を設定し、読み書きの PoC を実施する。
 - [ ] ダッシュボード・商品詳細モーダル・ジョブステータスビューを実装し、Server Action でユースケースを呼び出す。
 - [ ] トースト通知・操作ログ記録など UI の基本動作を完成させる。
 - [ ] Playwright スクリプトを作成し、ログイン〜下書き保存直前までの自動化を実装する。
