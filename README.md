@@ -82,6 +82,17 @@
 | ステータス更新 | `ステータスを「下書き準備済み」に戻しました` | 成功レベル |
 | エラーメモ保存 | `エラーメモを更新しました` | 成功レベル |
 
+### 認証・アクセス制御（ダッシュボード）
+- NextAuth.js + Credentials Provider を利用し、`.env.local` / Vercel Secrets に設定した単一の管理者メールアドレス・パスワードで認証する。
+  - `ADMIN_EMAIL`, `ADMIN_PASSWORD` を環境変数に定義し、アカウント追加は想定しない。
+- ロールは `admin` のみ。ログインしたユーザーだけが一覧閲覧・送信・再送信・ステータス更新などすべての操作を行える。
+- 未ログイン時は `/login` ページへリダイレクトし、ダッシュボードコンテンツは表示しない。
+- パスワードリセット機能は提供せず、環境変数の更新 + 再デプロイで対応。
+- セッション有効期限はブラウザのセッションに任せ、特別な期限を設けない。
+- アクセス制御は App Router の `middleware.ts` で実装し、未認証リクエストは `/login` へ強制誘導。
+- Server Action / API Route はセッション確認後にユースケースを呼び出す。認証エラー時は 401 を返し、ログインページへ誘導。
+- 送信・再送信実行時には操作ログ（ユーザーID、操作内容、対象商品、タイムスタンプ）を `SubmissionJob` と同時に記録し、30 日以上保持する。
+
 ## 主要機能
 - Google Sheetsからの商品データ取得・同期（差分検知、ステータス更新）。
 - PFごとの入力項目マッピングとバリデーション。
@@ -214,10 +225,10 @@ export interface PlatformAdapter {
 - **クリーンアップ**: 実行後にブラウザインスタンスを確実に閉じ、セッション・Cookie を破棄。必要に応じて Playwright の `context.storageState` を用いてログイン状態をキャッシュし、期限切れ時のみ再ログインする。
 - **監視指標**: `MetricsPort` でジョブ成功数、失敗数、平均処理時間、タイムアウト発生数などを記録。Dashbord で日次集計を表示することを検討。
 
-## 想定データモデル（初期案）
-- `Product`: スプレッドシートと同期する商品情報。タイトル、説明、価格、タグ、画像参照先のメタ情報、PF別の出品ステータスを保持。
-- `SubmissionJob`: 実行された自動投稿ジョブの履歴。対象PF、開始・終了時刻、結果、エラー内容など。
-- `PlatformConfig`: PF固有の入力マッピング・必須項目・バリデーションルール。
+## データ保持方針
+- 当面は Google スプレッドシートをマスターデータとして利用し、アプリは同期・送信・進捗管理を担う。
+- `Product` や `SubmissionJob` の情報もスプレッドシートとログ（Playwright 実行結果）で管理し、専用データベースは導入しない。
+- 将来的に検索パフォーマンスやバックアップ用途で必要になった場合にのみ、Postgres / Supabase などの永続化スキーマを別途検討する。
 
 ### Google Sheets 項目定義（ドラフト）
 Creema / minne 双方の要件を満たすために、シート上では両PFの項目を包含するスキーマを採用する。未対応PF向けの項目は空欄で構わず、どの列を参照するかはアダプタ側で判定する。
@@ -338,6 +349,10 @@ PLAYWRIGHT_MINNE_PASSWORD=<password>
 # セッション管理・通知
 SESSION_SECRET=<random string>
 SLACK_WEBHOOK_URL=<https://hooks.slack.com/...>
+
+# Dashboard Admin Credentials
+ADMIN_EMAIL=<admin@example.com>
+ADMIN_PASSWORD=<strong password>
 ```
 
 #### シークレットローテーション手順
