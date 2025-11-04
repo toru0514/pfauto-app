@@ -440,7 +440,7 @@ ADMIN_PASSWORD=<strong password>
 - [x] Tailwind CSS・shadcn/ui・lucide-react を導入し、共通スタイルを整備する。
 - [x] `pnpm dlx shadcn-ui init` などで UI コンポーネント生成基盤を整える。
 - [x] NextAuth.js（Credentials Provider）を導入し、`.env.local` に `ADMIN_EMAIL` / `ADMIN_PASSWORD` を設定する。
-- [ ] `.env.example` を更新し、必要な環境変数（Google Sheets / Playwright 等）を共有する。
+- [x] `.env.example` を更新し、必要な環境変数（Google Sheets / Playwright 等）を共有する。
 - [ ] Service Account を発行し、対象 Spreadsheet へのアクセス権を付与する。
 - [ ] `GOOGLE_SERVICE_ACCOUNT_BASE64` / `GOOGLE_SHEETS_SPREADSHEET_ID` を設定し、読み書きの PoC を実施する。
 - [ ] ダッシュボード・商品詳細モーダル・ジョブステータスビューを実装し、Server Action でユースケースを呼び出す。
