@@ -436,8 +436,8 @@ ADMIN_PASSWORD=<strong password>
 ## 開発〜運用移行チェックリスト
 - [x] GitHub リポジトリを作成し、`.gitignore` に `.env*` や `playwright/.auth` を追加する。
 - [ ] README（本ドキュメント）を `main` ブランチに反映し、`feature/*` ブランチ運用を開始する。
-- [ ] `pnpm create next-app`（App Router / TypeScript）でプロジェクトを生成する。
-- [ ] Tailwind CSS・shadcn/ui・lucide-react を導入し、共通スタイルを整備する。
+- [x] `pnpm create next-app`（App Router / TypeScript）でプロジェクトを生成する。
+- [x] Tailwind CSS・shadcn/ui・lucide-react を導入し、共通スタイルを整備する。
 - [ ] `pnpm dlx shadcn-ui init` などで UI コンポーネント生成基盤を整える。
 - [ ] NextAuth.js（Credentials Provider）を導入し、`.env.local` に `ADMIN_EMAIL` / `ADMIN_PASSWORD` を設定する。
 - [ ] `.env.example` を更新し、必要な環境変数（Google Sheets / Playwright 等）を共有する。
