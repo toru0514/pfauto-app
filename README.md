@@ -438,7 +438,7 @@ ADMIN_PASSWORD=<strong password>
 - [ ] README（本ドキュメント）を `main` ブランチに反映し、`feature/*` ブランチ運用を開始する。
 - [x] `pnpm create next-app`（App Router / TypeScript）でプロジェクトを生成する。
 - [x] Tailwind CSS・shadcn/ui・lucide-react を導入し、共通スタイルを整備する。
-- [ ] `pnpm dlx shadcn-ui init` などで UI コンポーネント生成基盤を整える。
+- [x] `pnpm dlx shadcn-ui init` などで UI コンポーネント生成基盤を整える。
 - [ ] NextAuth.js（Credentials Provider）を導入し、`.env.local` に `ADMIN_EMAIL` / `ADMIN_PASSWORD` を設定する。
 - [ ] `.env.example` を更新し、必要な環境変数（Google Sheets / Playwright 等）を共有する。
 - [ ] Service Account を発行し、対象 Spreadsheet へのアクセス権を付与する。
