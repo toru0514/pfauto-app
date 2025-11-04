@@ -339,6 +339,7 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 # Google Sheets 連携
 GOOGLE_SERVICE_ACCOUNT_BASE64=<Base64-encoded JSON>
 GOOGLE_SHEETS_SPREADSHEET_ID=<Spreadsheet ID>
+GOOGLE_SHEETS_WORKSHEET_TITLE=シート1
 
 # Playwright 自動化用資格情報
 PLAYWRIGHT_CREEMA_EMAIL=<creema@example.com>
@@ -443,8 +444,8 @@ ADMIN_PASSWORD=<strong password>
 - [x] `.env.example` を更新し、必要な環境変数（Google Sheets / Playwright 等）を共有する。
 - [x] Service Account を発行し、対象 Spreadsheet へのアクセス権を付与する。
 - [x] `GOOGLE_SERVICE_ACCOUNT_BASE64` / `GOOGLE_SHEETS_SPREADSHEET_ID` を設定し、読み書きの PoC を実施する。
-- [ ] ダッシュボード・商品詳細モーダル・ジョブステータスビューを実装し、Server Action でユースケースを呼び出す。
-- [ ] トースト通知・操作ログ記録など UI の基本動作を完成させる。
+- [x] ダッシュボード・商品詳細モーダル・ジョブステータスビューを実装し、Server Action でユースケースを呼び出す。
+- [x] トースト通知・操作ログ記録など UI の基本動作を完成させる。
 - [ ] Playwright スクリプトを作成し、ログイン〜下書き保存直前までの自動化を実装する。
 - [ ] CI 用スモークテストとローカル/ステージング用フルテストを用意する。
 - [ ] GitHub Actions ワークフローで `pnpm lint` / `pnpm test` / Playwright スモークテストを実行する。
