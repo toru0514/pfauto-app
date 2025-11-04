@@ -8,17 +8,40 @@
 - **利用技術**: フロントエンドはNext.js + Tailwind CSS + shadcn/ui、バックエンド/APIはNext.js内で構築。自動化処理にPlaywrightを利用し、Vercelへデプロイする。
 
 ## ユースケース
-- 商品情報をスプレッドシートで一元管理し、対象PFに応じた下書きを自動生成。
-- 投稿前の状態まで自動操作し、ユーザーが最終確認・微調整のうえ手動で公開する運用。
-- 複数PFへの同時出品を効率化し、ヒューマンエラーを削減。
+- 作業者がスプレッドシートで商品情報と出品先を入力し、管理画面の送信ボタンから対象商品の自動下書き作成を依頼できる。
+- 自動化は下書き保存直前までを担い、作業者が最終チェックと公開操作を手動で行うことでプラットフォーム規約を順守する。
+- Creema / minne を横断した出品作業を一元管理し、重複入力や入力漏れなどのヒューマンエラーを削減する。
 
 ### 作業者フロー（想定運用）
 1. **スプレッドシート入力**: 商品名、説明、価格、カテゴリ、画像URLなどを README の項目定義に従って入力する。Creema/minne 固有の列が必要な場合は同時に埋める。
 2. **下書き準備ステータス設定**: 出品したいプラットフォーム（Creema / minne / 両方）をシートの「出品先」列に記入し、ステータス列を「下書き準備済み」に更新する（初回登録時は自動的に「新規」から「下書き準備済み」へ切り替わる想定）。
-3. **自動アップロード実行ボタン**: 管理画面やシートの送信ボタンから対象商品の自動アップロードを起動する。ボタン押下と同時に処理キューへ登録される。
-4. **進捗モニタリング**: ダッシュボードで「待機中」「処理中」「下書き作成済み」などの進捗を確認し、必要に応じてエラーログや通知（Slack など）をチェックする。
+3. **管理画面で送信**: アプリの「最新データを同期」操作で対象商品を読み込み、内容を確認したうえで送信ボタンを押す。送信と同時に処理キューへ登録される。
+4. **進捗モニタリング**: ダッシュボードで「待機中」「処理中」「下書き作成済み」などの進捗を確認し、必要に応じてエラーログや画面内トースト通知をチェックする。
 5. **下書き確認**: Creema/minne の管理画面にアクセスし、生成された下書きを確認・微調整して手動で公開する。問題があればステータスを再び「下書き準備済み」に戻し、再実行ボタンでリトライする。
 6. **完了アーカイブ**: 公開済みの商品はシート上のステータスを「公開済み」などに更新し、以後の自動化対象から除外する。
+
+### UI 画面構成（ドラフト）
+1. **ダッシュボード（商品一覧）**
+   - シートと同期した商品の一覧を表示。列: 商品名、出品先、現在ステータス、最終同期日時、最新エラーメモ。
+   - アクション: 「最新データを同期」ボタン（Sheets→アプリ再読込）、「送信」ボタン（選択商品の自動アップロード）、詳細モーダル表示、エラーメモクリア、ステータスの手動変更。
+   - フィルター/ソート: プラットフォーム別、ステータス別、更新日時順。
+   - トースト通知: 送信成功/失敗時に結果を表示。
+
+2. **商品詳細モーダル**
+   - 商品情報の概要と、Creema / minne 各プラットフォーム向けの入力値を確認。
+   - ジョブ履歴タブ: 過去の実行履歴、ステータス推移、スクリーンショットリンクを表示。
+   - 操作ボタン: 「再送信」「ステータスを下書き準備済みに戻す」「エラーメモを記録」など。
+
+3. **ジョブステータスビュー**
+   - 現在キューに積まれているジョブと進行中ジョブをタイムラインで表示。
+   - 各ジョブの開始時刻、対象プラットフォーム、処理結果（成功/失敗）、リトライ回数を一覧化。
+   - フィルターで特定商品のジョブのみを追跡できるようにする。
+
+4. **設定 / 連携画面**（後続）
+   - Google Sheets 連携のスプレッドシートID登録、Service Account キーアップロード。
+   - 通知設定（トースト、将来的な Slack / メール）や Playwright 実行のデフォルト設定（並列数、タイムアウト）を管理。
+
+各画面は shadcn/ui をベースに、一覧は `DataTable` コンポーネント、モーダルは `Dialog`、操作ボタンは `Button` を想定。フォーム入力やステータス更新は `react-hook-form` + `zod` でバリデーションを行う。
 
 ## 主要機能
 - Google Sheetsからの商品データ取得・同期（差分検知、ステータス更新）。
@@ -61,6 +84,43 @@
 - outbound adapters: Google Sheets、Playwright ジョブランナー、データベースなど。ドメイン/アプリケーション層からはポート経由で利用し、具体実装は `adapters/outbound/*` にまとめる。
 - テスト方針はレイヤ単位に用意し、ドメイン層は純粋なユニットテスト、アプリケーション層はポートをモック化したサービステスト、アダプタ層は統合テスト（Playwright, API 経路）を実行する。
 
+### アプリケーション層ポート・ユースケース
+`application/ports` ではユースケースが外部とやり取りするインターフェースを定義し、実装はアダプタ層に委ねる。
+
+- `ProductRepositoryPort`
+  - `listReadyProducts()` : 「下書き準備済み」等の状態の商品データを取得。
+  - `updateProductStatus(productId, status, options)` : ステータスやエラーメモを更新。
+  - `recordSyncMetadata(productId, metadata)` : 同期時刻や担当PFなどを記録。
+- `PlatformAutomationPort`
+  - `enqueue(productId, platform)` : プラットフォームごとの自動化ジョブをキューに投入。
+  - `markJobResult(jobId, result)` : ジョブ成功/失敗・ログURL等を保存。
+- `NotificationPort`
+  - `notify(target, payload)` : 管理画面のトースト通知を表示（将来的に Slack / メールへ拡張可能）。
+- `MetricsPort`
+  - `increment(metric, tags)` : 実行回数やエラー数を記録。
+- `FileStoragePort`
+  - `uploadScreenshot(jobId, buffer)` : Playwright 実行時のスクリーンショット保存。
+
+主要ユースケース（`application/usecases` 想定）
+- `SyncProductsUseCase`
+  - inbound: App Router からの実行/スケジューラ。
+  - ports: `ProductRepositoryPort`, `PlatformAutomationPort`, `NotificationPort`。
+  - 手順: Sheets から差分取得→ステータス更新→バリデーション→ジョブキュー投入→結果を管理画面トーストで通知。
+- `RefreshDraftStatusUseCase`
+  - inbound: 手動トリガーや定期バッチ。
+  - ports: `ProductRepositoryPort`, `PlatformAutomationPort`。
+  - 手順: ジョブ結果を確認し、ステータス/メタデータを更新。
+- `RetryFailedJobUseCase`
+  - inbound: 作業者の再実行操作。
+  - ports: `ProductRepositoryPort`, `PlatformAutomationPort`, `NotificationPort`。
+  - 手順: エラー商品の内容を再チェック→再キュー投入→トースト通知。
+- `LogAutomationResultUseCase`
+  - inbound: ジョブランナーからのコールバック/完了イベント。
+  - ports: `PlatformAutomationPort`, `ProductRepositoryPort`, `MetricsPort`, `FileStoragePort`。
+  - 手順: 実行結果/スクリーンショット保存→商品のステータス更新→メトリクス記録。
+
+各ユースケースはドメインサービスを組み合わせ、アダプタ層を直接参照せずに完結する構造を保つ。
+
 ### PlatformAdapter インターフェース方針
 - 役割: Sheets の `Product` レコードを PF 固有の入力仕様へマッピングし、Playwright 実行ジョブに渡すための正規化・バリデーションを担当する。
 - 実装場所: `adapters/outbound/platforms/<pf>/adapter.ts`（例: `adapters/outbound/platforms/creema/adapter.ts`）。共通型やユーティリティは `application/ports/platforms` や `core/platform` 等で共有。
@@ -83,11 +143,11 @@ export interface PlatformAdapter {
 - テスト指針: 各 Adapter ごとにユニットテストを用意し、`normalize`/`validate`/`buildAutomationSteps` の変換ロジックを検証する。PF仕様変更時の regression を早期に検知する目的。
 
 ### ユースケース実行フロー（同期〜自動化）
-1. **商品データ同期（Google Sheets）**: inbound adapter（UI/Server Action）が `application` 層の同期ユースケースを呼び出し、指定スプレッドシートから `ProductRecord` の一覧を取得する。差分検知ロジックで新規・更新・削除を判定し、`sync_status` を `new`/`ready` に更新する。
-2. **バリデーション & 正規化**: `application` 層で対象PFごとに PlatformAdapter を解決し、`canProcess` → `normalize` → `validate` を順に実行。`validate` でエラーが発生したレコードは `sync_status` を `error`、`last_error_message_<pf>` に原因を記録して終了する。
-3. **Playwright 実行キュー投入**: 合格したレコードは `SubmissionJob` としてエンキューし、ジョブランナー（outbound adapter）が Playwright セッションを起動。`buildAutomationSteps` の出力に従い、ログイン〜フォーム入力〜下書き保存前までを自動操作する。実行中はステータスを `queued` → `processing` に遷移させる。
-4. **ステータス更新 & ログ出力**: Playwright 実行結果に応じて `drafted` または `error` を設定し、タイムスタンプとスクリーンショット／ログを `SubmissionJob` に紐付ける。必要に応じて Slack 通知など outbound adapter を介して運用チームへ通知する。
-5. **リトライ・再同期**: 手動で修正されたレコードは Sheets 側で `sync_status` を `ready` に戻し、1 の同期ユースケースで再取り込みする。自動リトライは回数・間隔をアプリケーション層で制御し、閾値を超えた場合は `skipped` に遷移させる。
+1. **商品データ同期（Google Sheets）**: inbound adapter（UI/Server Action）が `application` 層の同期ユースケースを呼び出し、スプレッドシートから「下書き準備済み」の商品行を取得する（内部的には `sync_status = ready` 等に対応）。差分検知で新規・更新・削除を判定し、必要に応じて状態を更新。
+2. **バリデーション & 正規化**: `application` 層で対象プラットフォームの PlatformAdapter を解決し、`canProcess` → `normalize` → `validate` を順に実行。バリデーションで問題が見つかった場合はエラー内容を記録し、シート上のステータスを「エラー」に戻す（内部的には `sync_status = error`）。
+3. **Playwright 実行キュー投入**: 合格した商品のみキューへ登録し、ジョブランナー（outbound adapter）が Playwright セッションを開始。`buildAutomationSteps` の出力に従い、ログイン〜フォーム入力〜下書き保存直前まで自動操作する。処理中は「待機中」→「処理中」と状態を遷移させる。
+4. **ステータス更新 & ログ出力**: 実行結果に応じて「下書き作成済み」または「エラー」に設定し、タイムスタンプやスクリーンショット、ログを `SubmissionJob` に紐付けて保存。必要に応じて Slack 通知など outbound adapter を介して運用チームへ共有する。
+5. **リトライ・再同期**: 作業者がシート上で内容を修正した場合はステータスを再び「下書き準備済み」に更新し、1 の同期ユースケースで再取り込みする。自動リトライの回数・間隔はアプリケーション層で制御し、閾値を超えた場合は「処理対象外」（内部的には `skipped`）に移行する。
 
 ## 想定データモデル（初期案）
 - `Product`: スプレッドシートと同期する商品情報。タイトル、説明、価格、タグ、画像参照先のメタ情報、PF別の出品ステータスを保持。
@@ -124,6 +184,21 @@ Creema / minne 双方の要件を満たすために、シート上では両PFの
 - `creema_category_id`, `creema_shipping_profile_id`, `creema_handling_time_days`, `creema_shop_section`: Creema 専用列。未設定の場合は PlatformAdapter が既定値を適用するかエラーにする。
 - `minne_category_id`, `minne_shipping_method_id`, `minne_shipping_fee_code`, `minne_required_options`: minne 専用列。空欄の場合は同期対象から除外するか、バリデーションで警告を返す。
 - PF固有列は `<pf>_<domain>_<name>` 命名を基本とし、追加PFにも拡張しやすいよう運用する。
+
+#### スプレッドシートテンプレート（例）
+```text
+product_id | sku | title | subtitle | description | price | inventory | material | size_notes | weight_grams | tags | category_common | image_urls | variant_options | production_lead_time_days | shipping_fee | shipping_method | shipping_origin_pref | 出品先 | ステータス | creema_category_id | minne_category_id | notes_internal
+abc-001    | A-01| 春色ブーケピアス |           | 300字以内で商品説明を記載 | 3500 | 5 | 真鍮, ガラス | 全長約3cm | 10 | ピアス, 春 | アクセサリー/ピアス | https://example.com/images/abc-001-1.jpg\nhttps://example.com/images/abc-001-2.jpg | [{"option":"カラー","values":["ピンク","ブルー"]}] | 7 | 250 | ゆうパケット | 東京都 | creema,minne | 下書き準備済み | 123456 | 7890 | ラッピング可。母の日特集予定
+```
+
+#### 入力ルール
+- **必須項目**: 商品タイトル、説明、価格、共通カテゴリ、発送元都道府県、出品先（Creema / minne / 両方）、ステータス。
+- **文字数ガイド**: タイトルは 40 文字以内、サブタイトルは 20 文字以内、説明は 3000 文字以内を目安とする。プラットフォームの実際の制限を超えないよう注意。
+- **画像URL**: 1 行につき 1 URL を記入し、先頭から順にアップロードする。HTTPS の JPEG/PNG を推奨し、最大 5 枚程度を想定。
+- **価格・在庫**: 価格は税込整数（円）で入力。在庫は minne の要件に合わせて 1 以上の整数を推奨。
+- **タグ**: カンマ区切りで最大 10 件、各タグは 20 文字以内を目安とする。
+- **ステータス列**: 「新規」→「下書き準備済み」→「待機中」→「処理中」→「下書き作成済み」→「公開済み」の遷移を想定。リトライ時は「下書き準備済み」に戻す。
+- **PF固有列**: Creema のカテゴリID、minne の発送方法ID など必須項目は空欄にしない。未入力の場合は自動化対象外（スキップ）またはエラーとして戻される。
 
 #### ステータス列と遷移
 - `sync_status`: 全体の同期状態。`new` → `ready` → `queued` → `processing` → `drafted` を基本とし、`error` / `skipped` で終了できる。
