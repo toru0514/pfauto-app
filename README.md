@@ -47,15 +47,15 @@
 - Lint/Format は `eslint-config-next` に加えて `@typescript-eslint` の推奨設定を適用し、Prettier をフォーマッタに統一する。コミット前フックとして `lint-staged` + `husky` を導入し、`pnpm lint` / `pnpm test` が通ることを前提としたレビュー運用を行う。
 
 ### ヘキサゴナルアーキテクチャ指針
-- ドメイン層（`core/`）を中心に、アプリケーション層・アダプタ層をポート経由で接続する。ユースケースはアプリケーション層に集約し、UIや外部サービスからの依存がドメインへ直接届かないようにする。
-- ポート定義は TypeScript のインターフェースで表現し、`application/ports` などに配置する。アダプタはこれらのポートを実装する構成とする。
+- ドメイン層（`core/`）を中心に、アプリケーション層とアダプタ層をポート経由で接続する。ユースケースはアプリケーション層に集約し、UI や外部サービスからの依存がドメインへ直接届かない構成とする。
+- ポート定義は TypeScript のインターフェースで表し、`application/ports` などで管理する。アダプタはこれらのポートを実装したクラス/関数として `adapters/*` に配置。
 - inbound adapters: Next.js App Router（ページ、API Routes、Server Actions）や Webhook など。アプリケーション層のユースケースを呼び出し、DTO 変換を担う。
-- outbound adapters: Google Sheets、Playwright ジョブランナー、データベースなど。ドメイン/アプリケーション層からはポートを通じて利用し、具体実装は `adapters/outbound/*` に収める。
+- outbound adapters: Google Sheets、Playwright ジョブランナー、データベースなど。ドメイン/アプリケーション層からはポート経由で利用し、具体実装は `adapters/outbound/*` にまとめる。
 - テスト方針はレイヤ単位に用意し、ドメイン層は純粋なユニットテスト、アプリケーション層はポートをモック化したサービステスト、アダプタ層は統合テスト（Playwright, API 経路）を実行する。
 
 ### PlatformAdapter インターフェース方針
 - 役割: Sheets の `Product` レコードを PF 固有の入力仕様へマッピングし、Playwright 実行ジョブに渡すための正規化・バリデーションを担当する。
-- 実装場所: `adapters/outbound/platforms/<pf>/adapter.ts`（例: `adapters/outbound/platforms/creema/adapter.ts`）。共通型やユーティリティは `application/ports/platforms` や `core/platform` 等に配置する。
+- 実装場所: `adapters/outbound/platforms/<pf>/adapter.ts`（例: `adapters/outbound/platforms/creema/adapter.ts`）。共通型やユーティリティは `application/ports/platforms` や `core/platform` 等で共有。
 
 ```ts
 export interface PlatformAdapter {
