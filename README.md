@@ -449,6 +449,7 @@ ADMIN_PASSWORD=<strong password>
 - [ ] CI 用スモークテストとローカル/ステージング用フルテストを用意する。
 - [ ] GitHub Actions ワークフローで `pnpm lint` / `pnpm test` / Playwright スモークテストを実行する。
 - [ ] Vercel をリポジトリに接続し、Preview / Production デプロイを確認する。
+- [ ] このリポジトリに合わせて Vercel の環境変数を設定し、開発メンバーが `vercel env pull` で取得できるようにする。
 - [ ] Google Sheets にテスト商品を登録し、同期→送信→下書き確認フローを通す。
 - [ ] エラーハンドリング・ログ保存・操作ログ記録が期待通りか確認する。
 - [ ] 運用チェックリストに沿って最終確認し、Playwright スモークテストや手動操作を完了する。
