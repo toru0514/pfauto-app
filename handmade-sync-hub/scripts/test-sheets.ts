@@ -22,12 +22,25 @@ async function main() {
 
   const sheets = google.sheets({ version: "v4", auth });
 
+  const sheetTitle = process.env.GOOGLE_SHEETS_WORKSHEET_TITLE || "シート1";
+
   const response = await sheets.spreadsheets.values.get({
     spreadsheetId,
-    range: "A1:B5",
+    range: `${sheetTitle}!A1:ZZ200`,
+    majorDimension: "ROWS",
   });
 
-  console.log("Spreadsheet values:", response.data.values);
+  const values = response.data.values ?? [];
+
+  if (!values.length) {
+    console.log("Spreadsheet is empty or range returned no values.");
+    return;
+  }
+
+  console.log("Spreadsheet preview (first 10 rows):");
+  for (const row of values.slice(0, 10)) {
+    console.log(row);
+  }
 }
 
 main().catch((error) => {
