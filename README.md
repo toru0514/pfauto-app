@@ -434,7 +434,7 @@ ADMIN_PASSWORD=<strong password>
 - 法令対応（特商法、個人情報保護）やコンプライアンス確認プロセス。
 
 ## 開発〜運用移行チェックリスト
-- [ ] GitHub リポジトリを作成し、`.gitignore` に `.env*` や `playwright/.auth` を追加する。
+- [x] GitHub リポジトリを作成し、`.gitignore` に `.env*` や `playwright/.auth` を追加する。
 - [ ] README（本ドキュメント）を `main` ブランチに反映し、`feature/*` ブランチ運用を開始する。
 - [ ] `pnpm create next-app`（App Router / TypeScript）でプロジェクトを生成する。
 - [ ] Tailwind CSS・shadcn/ui・lucide-react を導入し、共通スタイルを整備する。
