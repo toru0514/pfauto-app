@@ -384,7 +384,13 @@ ADMIN_PASSWORD=<strong password>
   - ログインセッション更新: PF 側でパスワード変更時は `playwright/.auth` の storage state を再生成。
   - 2FA デバイスの確認: Authenticator アプリやバックアップコードをテストし、期限切れがないか点検。
   - Vercel の環境変数/Secrets に保存している資格情報のローテーション。
-  - Playwright Test のスモークテストを定期実行し、DOM 変更によるセレクタ崩れを早期検知。
+  - - Playwright Test のスモークテストを定期実行し、DOM 変更によるセレクタ崩れを早期検知。
+- **Creema PoC スクリプト**
+  - ソース: `playwright/tests/creema-draft.spec.ts`
+  - `.env.local` に `PLAYWRIGHT_CREEMA_EMAIL` / `PLAYWRIGHT_CREEMA_PASSWORD` を設定し、対象商品のステータスを `ready` にする（プラットフォーム列に `creema` を含む行）。
+  - 実行前にブラウザバイナリを取得: `pnpm dlx playwright install --with-deps`
+  - 誤操作防止のためデフォルトでスキップ。`PLAYWRIGHT_RUN_CREEMA=true pnpm test:e2e --project=creema-chromium` で有効化できる。
+  - スクリプト内の `selectors` は仮置き。実際の DOM に合わせて更新し、画像アップロードやカテゴリ選択などの必須項目を追記する。
 - **検証環境**: Creema / minne のテスト用アカウント（本番と同等のフローが確認できるもの）。
 - **ログイン情報管理**: メールアドレス・パスワード、2段階認証コード取得手段（Authenticator／メールなど）。
 - **ターゲットページの調査**: ログインページ、商品登録フォーム、下書き保存ページのURLと遷移フロー。
@@ -446,7 +452,7 @@ ADMIN_PASSWORD=<strong password>
 - [x] `GOOGLE_SERVICE_ACCOUNT_BASE64` / `GOOGLE_SHEETS_SPREADSHEET_ID` を設定し、読み書きの PoC を実施する。
 - [x] ダッシュボード・商品詳細モーダル・ジョブステータスビューを実装し、Server Action でユースケースを呼び出す。
 - [x] トースト通知・操作ログ記録など UI の基本動作を完成させる。
-- [ ] Playwright スクリプトを作成し、ログイン〜下書き保存直前までの自動化を実装する。
+- [x] Playwright スクリプトを作成し、ログイン〜下書き保存直前までの自動化を実装する。
 - [ ] CI 用スモークテストとローカル/ステージング用フルテストを用意する。
 - [ ] GitHub Actions ワークフローで `pnpm lint` / `pnpm test` / Playwright スモークテストを実行する。
 - [ ] Vercel をリポジトリに接続し、Preview / Production デプロイを確認する。
