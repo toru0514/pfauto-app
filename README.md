@@ -27,21 +27,60 @@
    - フィルター/ソート: プラットフォーム別、ステータス別、更新日時順。
    - トースト通知: 送信成功/失敗時に結果を表示。
 
+   | 列 ID | 表示名 | 内容 | 備考 |
+   | --- | --- | --- | --- |
+   | title | 商品名 | Sheets の `title` | クリックで詳細モーダルを開く |
+   | platforms | 出品先 | Creema / minne のバッジ表示 | 複数の場合は複数バッジ |
+   | status | ステータス | 「下書き準備済み」「待機中」など | アイコン/色で状態を可視化 |
+   | lastSyncedAt | 最終同期 | 最終同期日時 | 未同期時は `-` |
+   | lastError | 最新エラー | エラーメモの冒頭 50 文字 | 全文表示用のツールチップやモーダル |
+   | actions | 操作 | 「送信」「詳細」「ステータス変更」ボタン | 送信時に対象PF選択ダイアログを表示 |
+
 2. **商品詳細モーダル**
    - 商品情報の概要と、Creema / minne 各プラットフォーム向けの入力値を確認。
    - ジョブ履歴タブ: 過去の実行履歴、ステータス推移、スクリーンショットリンクを表示。
    - 操作ボタン: 「再送信」「ステータスを下書き準備済みに戻す」「エラーメモを記録」など。
+
+   **タブ構成**
+   - 概要: 共通情報（タイトル、価格、在庫、タグ、出品先、ステータス、最終同期日時、エラーメモ）。
+   - Creema: Creema 向けフィールド（カテゴリID、素材、サイズ、配送設定など）。
+   - minne: minne 向けフィールド（カテゴリID、発送方法、送料、オプションなど）。
+   - ジョブ履歴: 過去の実行履歴（開始時刻、結果、所要時間、スクリーンショットリンク、ログURL）。
+
+   **主要コンポーネント**
+   - `Tabs` + `TabContent`
+   - `KeyValueList`（概要表示）
+   - `JobHistoryTable`
+   - ボタン群（再送信、ステータスリセット、エラーメモ保存）
 
 3. **ジョブステータスビュー**
    - 現在キューに積まれているジョブと進行中ジョブをタイムラインで表示。
    - 各ジョブの開始時刻、対象プラットフォーム、処理結果（成功/失敗）、リトライ回数を一覧化。
    - フィルターで特定商品のジョブのみを追跡できるようにする。
 
+   | 列 ID | 表示名 | 内容 |
+   | --- | --- | --- |
+   | jobId | ジョブID | 内部ID（短縮表示） |
+   | product | 商品名 | 商品タイトル + プラットフォームバッジ |
+   | status | 進捗 | 「待機中」「処理中」「成功」「失敗」など |
+   | attempt | 試行回数 | 現在のリトライ数 / 設定上限 |
+   | startedAt | 開始時刻 | ローカライズされた日時 |
+   | duration | 所要時間 | 完了時のみ表示 |
+
 4. **設定 / 連携画面**（後続）
    - Google Sheets 連携のスプレッドシートID登録、Service Account キーアップロード。
    - 通知設定（トースト、将来的な Slack / メール）や Playwright 実行のデフォルト設定（並列数、タイムアウト）を管理。
 
 各画面は shadcn/ui をベースに、一覧は `DataTable` コンポーネント、モーダルは `Dialog`、操作ボタンは `Button` を想定。フォーム入力やステータス更新は `react-hook-form` + `zod` でバリデーションを行う。
+
+#### トースト通知の想定
+| イベント | メッセージ例 | 備考 |
+| --- | --- | --- |
+| 送信開始 | `「春色ブーケピアス」の送信を開始しました` | 情報レベル。複数件送信時は件数を含める |
+| 送信成功 | `Creema 下書き作成が完了しました` | 成功レベル。詳細モーダルへのリンクを表示 |
+| 送信失敗 | `minne でエラーが発生しました: カテゴリが未設定です` | エラーレベル。再送信ボタンをトースト内に配置 |
+| ステータス更新 | `ステータスを「下書き準備済み」に戻しました` | 成功レベル |
+| エラーメモ保存 | `エラーメモを更新しました` | 成功レベル |
 
 ## 主要機能
 - Google Sheetsからの商品データ取得・同期（差分検知、ステータス更新）。
@@ -101,6 +140,21 @@
 - `FileStoragePort`
   - `uploadScreenshot(jobId, buffer)` : Playwright 実行時のスクリーンショット保存。
 
+#### API / Server Action のエンドポイント構成（案）
+
+| Path | Method / 種別 | 認証 | 呼び出すユースケース | 主な I/O |
+| --- | --- | --- | --- | --- |
+| `/api/sync` | POST（Server Action） | ログイン済みユーザー | `SyncProductsUseCase` | リクエストなし／レスポンス: 処理件数、エラー概要 |
+| `/api/automation/enqueue` | POST（Server Action） | ログイン済みユーザー | `PlatformAutomationPort.enqueue` 経由で `SyncProductsUseCase` | 入力: `productId`, `platforms[]` |
+| `/api/automation/retry` | POST | ログイン済みユーザー | `RetryFailedJobUseCase` | 入力: `productId`, `platform` |
+| `/api/automation/status` | GET | ログイン済みユーザー | `RefreshDraftStatusUseCase` | 出力: ジョブリスト（`jobId`, `status`, `attempt`, `timestamps`）|
+| `/api/products/[id]` | GET | ログイン済みユーザー | `ProductRepositoryPort` | 出力: 商品詳細、ステータス、エラーメモ、ジョブ履歴 |
+| `/api/products/[id]/status` | PATCH（Server Action） | ログイン済みユーザー | `ProductRepositoryPort.updateProductStatus` | 入力: `status`, `errorMessage?` |
+
+- フロントエンドからは Server Action を優先して利用し、App Router のフォーム送信やボタン押下で直接ユースケースを呼び出す。
+- API Route は非同期処理（Playwright ジョブ）からのコールバックや、外部連携用のエンドポイントとして利用。必要に応じて Next.js Route Handler でレスポンスキャッシュや認証ミドルウェアを挟む。
+- 認証は NextAuth などで実装し、管理者ロールのみが送信/再同期操作を行えるようにする。
+
 主要ユースケース（`application/usecases` 想定）
 - `SyncProductsUseCase`
   - inbound: App Router からの実行/スケジューラ。
@@ -146,8 +200,19 @@ export interface PlatformAdapter {
 1. **商品データ同期（Google Sheets）**: inbound adapter（UI/Server Action）が `application` 層の同期ユースケースを呼び出し、スプレッドシートから「下書き準備済み」の商品行を取得する（内部的には `sync_status = ready` 等に対応）。差分検知で新規・更新・削除を判定し、必要に応じて状態を更新。
 2. **バリデーション & 正規化**: `application` 層で対象プラットフォームの PlatformAdapter を解決し、`canProcess` → `normalize` → `validate` を順に実行。バリデーションで問題が見つかった場合はエラー内容を記録し、シート上のステータスを「エラー」に戻す（内部的には `sync_status = error`）。
 3. **Playwright 実行キュー投入**: 合格した商品のみキューへ登録し、ジョブランナー（outbound adapter）が Playwright セッションを開始。`buildAutomationSteps` の出力に従い、ログイン〜フォーム入力〜下書き保存直前まで自動操作する。処理中は「待機中」→「処理中」と状態を遷移させる。
-4. **ステータス更新 & ログ出力**: 実行結果に応じて「下書き作成済み」または「エラー」に設定し、タイムスタンプやスクリーンショット、ログを `SubmissionJob` に紐付けて保存。必要に応じて Slack 通知など outbound adapter を介して運用チームへ共有する。
+4. **ステータス更新 & ログ出力**: 実行結果に応じて「下書き作成済み」または「エラー」に設定し、タイムスタンプやスクリーンショット、ログを `SubmissionJob` に紐付けて保存。画面内トースト通知で結果を共有し、必要に応じて将来的に Slack / メールへ拡張する。
 5. **リトライ・再同期**: 作業者がシート上で内容を修正した場合はステータスを再び「下書き準備済み」に更新し、1 の同期ユースケースで再取り込みする。自動リトライの回数・間隔はアプリケーション層で制御し、閾値を超えた場合は「処理対象外」（内部的には `skipped`）に移行する。
+
+### Playwright ジョブ実行仕様
+- **キュー方式**: FIFO のジョブキューを採用。`PlatformAutomationPort.enqueue` で登録し、ジョブワーカー（Node.js プロセス）が順次処理する。
+- **並列数**: デフォルト 1 並列。将来的にプラットフォーム別の同時実行数を設定できるようにする（例: Creema 1、本番で増やす場合は環境変数で制御）。
+- **タイムアウト**: 1 ジョブあたり最大 5 分（`PLAYWRIGHT_JOB_TIMEOUT_MS` で設定）。ページ遷移やフォーム送信など重要ステップには個別のタイムアウト（30〜60 秒）も設定し、タイムアウト時はジョブを失敗扱いにする。
+- **リトライ**: 最大 2 回まで自動リトライ。初回失敗 → 直後リトライ、2 回目失敗 → `error` ステータスとして停止。リトライ間隔は指数バックオフ（例: 1 分 → 3 分）を想定。
+- **実行モード**: ヘッドレスを基本とし、デバッグ時はヘッドフルモード＋ステップ保存を可能にする（`PLAYWRIGHT_HEADLESS=false` で切り替え）。
+- **ログ・スクリーンショット**: 各ステップでログを `SubmissionJob` に紐付け、失敗時はスクリーンショットと HTML ダンプを `FileStoragePort` 経由で保存（Vercel Blob / Supabase Storage 等）。成功時は必要に応じて最小限のログのみ保存。
+- **通知**: 成功・失敗結果は `NotificationPort` を通じてトースト通知。複数ジョブ送信時はまとめて件数表示し、失敗ジョブには再送信ショートカットを付与。
+- **クリーンアップ**: 実行後にブラウザインスタンスを確実に閉じ、セッション・Cookie を破棄。必要に応じて Playwright の `context.storageState` を用いてログイン状態をキャッシュし、期限切れ時のみ再ログインする。
+- **監視指標**: `MetricsPort` でジョブ成功数、失敗数、平均処理時間、タイムアウト発生数などを記録。Dashbord で日次集計を表示することを検討。
 
 ## 想定データモデル（初期案）
 - `Product`: スプレッドシートと同期する商品情報。タイトル、説明、価格、タグ、画像参照先のメタ情報、PF別の出品ステータスを保持。
@@ -161,8 +226,7 @@ Creema / minne 双方の要件を満たすために、シート上では両PFの
 | --- | --- | --- | --- |
 | `product_id` | string | 商品の一意キー。PF横断で同一商品を識別する | Google Sheets のキー列。既存IDがない場合は UUID 等で採番 |
 | `sku` | string | 在庫管理向け SKU | 任意。空欄可 |
-| `title` | string | 商品タイトル（共通） | PF共通の基本名称。PF専用タイトルが必要な場合は後述専用列を使用 |
-| `subtitle` | string | 補足タイトル | Creema で入力欄あり。minne では任意 |
+| `title` | string | 商品タイトル（共通） | PF共通の基本名称 |
 | `description` | long text | 商品説明（共通） | Markdown想定。PF固有テンプレート列で上書き可能 |
 | `price` | number | 税込価格（円） | PFの最低価格要件を事前に満たすこと |
 | `inventory` | number | 在庫数 | minne 必須、Creema 任意 |
@@ -187,13 +251,13 @@ Creema / minne 双方の要件を満たすために、シート上では両PFの
 
 #### スプレッドシートテンプレート（例）
 ```text
-product_id | sku | title | subtitle | description | price | inventory | material | size_notes | weight_grams | tags | category_common | image_urls | variant_options | production_lead_time_days | shipping_fee | shipping_method | shipping_origin_pref | 出品先 | ステータス | creema_category_id | minne_category_id | notes_internal
-abc-001    | A-01| 春色ブーケピアス |           | 300字以内で商品説明を記載 | 3500 | 5 | 真鍮, ガラス | 全長約3cm | 10 | ピアス, 春 | アクセサリー/ピアス | https://example.com/images/abc-001-1.jpg\nhttps://example.com/images/abc-001-2.jpg | [{"option":"カラー","values":["ピンク","ブルー"]}] | 7 | 250 | ゆうパケット | 東京都 | creema,minne | 下書き準備済み | 123456 | 7890 | ラッピング可。母の日特集予定
+product_id | sku | title | description | price | inventory | material | size_notes | weight_grams | tags | category_common | image_urls | variant_options | production_lead_time_days | shipping_fee | shipping_method | shipping_origin_pref | 出品先 | ステータス | creema_category_id | minne_category_id | notes_internal
+abc-001    | A-01| 春色ブーケピアス | 300字以内で商品説明を記載 | 3500 | 5 | 真鍮, ガラス | 全長約3cm | 10 | ピアス, 春 | アクセサリー/ピアス | https://example.com/images/abc-001-1.jpg\nhttps://example.com/images/abc-001-2.jpg | [{"option":"カラー","values":["ピンク","ブルー"]}] | 7 | 250 | ゆうパケット | 東京都 | creema,minne | 下書き準備済み | 123456 | 7890 | ラッピング可。母の日特集予定
 ```
 
 #### 入力ルール
 - **必須項目**: 商品タイトル、説明、価格、共通カテゴリ、発送元都道府県、出品先（Creema / minne / 両方）、ステータス。
-- **文字数ガイド**: タイトルは 40 文字以内、サブタイトルは 20 文字以内、説明は 3000 文字以内を目安とする。プラットフォームの実際の制限を超えないよう注意。
+- **文字数ガイド**: タイトルは 40 文字以内、説明は 3000 文字以内を目安とする。プラットフォームの実際の制限を超えないよう注意。
 - **画像URL**: 1 行につき 1 URL を記入し、先頭から順にアップロードする。HTTPS の JPEG/PNG を推奨し、最大 5 枚程度を想定。
 - **価格・在庫**: 価格は税込整数（円）で入力。在庫は minne の要件に合わせて 1 以上の整数を推奨。
 - **タグ**: カンマ区切りで最大 10 件、各タグは 20 文字以内を目安とする。
@@ -206,6 +270,33 @@ abc-001    | A-01| 春色ブーケピアス |           | 300字以内で商品�
 - `last_synced_at_<pf>`: 最終同期時刻。Playwright 実行後に更新する。
 - `last_error_message_<pf>`: 直近のエラー要約。`error` 状態時のみ値を保持し、解消後は空欄に戻す。
 - 手動リカバリを行う場合は `sync_status` を `ready` に戻し、自動化キューが再処理できるようにする。
+
+#### 状態遷移（テキスト図）
+
+```
+sync_status (全体)
+  new → ready → queued → processing → drafted → (公開済み: 手動更新)
+                   ↘ error ↘ skipped ↘ ready (手動リトライ)
+
+creema_status / minne_status (PF別)
+  ready → queued → processing → drafted
+                     ↘ error ↘ ready (手動 or 自動リトライ)
+
+主なトリガー
+- new: シートに追加された直後。
+- ready: シート側で「下書き準備済み」に設定。SyncProductsUseCase が検知し、`listReadyProducts` で取得。
+- queued: 送信ボタン押下でキュー投入。PF別にも `queued` を設定。
+- processing: Playwright ジョブ開始時に設定。
+- drafted: Playwright 成功時。`last_synced_at_<pf>` を更新。
+- error: バリデーション失敗または Playwright 失敗時。`last_error_message_<pf>` に詳細を記録。
+- skipped: 必須項目不足などで実行対象外とした場合。
+- ready への手動戻し: UI の「ステータスを下書き準備済みに戻す」で実行。再同期すると再び `queued` 以降へ進む。
+
+備考
+- `sync_status` が `drafted` の場合でも PF 別ステータスが `drafted` になっていない場合は部分的な成功として扱い、残りの PF のみ再送信可能。
+- 送信前に `queued` のまま一定時間経過した場合は `sync_status = error`、`last_error_message` にタイムアウト理由を記録。
+- 公開後はシートのステータスを「公開済み」に更新し、自動化対象から除外。
+```
 
 ## 外部連携
 - **Google Sheets API**: 認証はService Accountを利用し、指定スプレッドシートの読み書きを行う。
@@ -266,6 +357,18 @@ SLACK_WEBHOOK_URL=<https://hooks.slack.com/...>
 8. BASEなど追加PFの検討とアダプタ設計見直し
 
 ## Playwright自動入力に向けた準備事項
+- **初期セットアップ**
+  - Playwright のインストール: `pnpm dlx playwright install --with-deps`
+  - 初回実行で必要なブラウザバイナリ（Chromium）を取得。
+  - `.env.local` に PF ログイン情報・2FA 設定・タイムアウト値などを記入し、`PLAYWRIGHT_` プレフィックスで管理。
+  - Service Account など認証ファイルは `GOOGLE_SERVICE_ACCOUNT_BASE64` から展開し、ローカルでは `playwright/.auth` ディレクトリに配置（Git 管理外）。
+  - Playwright Codegen で初回操作の録画を行い、フォーム入力手順を確認。
+- **定期メンテナンス**
+  - ブラウザバージョン更新（`pnpm dlx playwright install`）。最低でも四半期に一度、CI でも同期。
+  - ログインセッション更新: PF 側でパスワード変更時は `playwright/.auth` の storage state を再生成。
+  - 2FA デバイスの確認: Authenticator アプリやバックアップコードをテストし、期限切れがないか点検。
+  - Vercel の環境変数/Secrets に保存している資格情報のローテーション。
+  - Playwright Test のスモークテストを定期実行し、DOM 変更によるセレクタ崩れを早期検知。
 - **検証環境**: Creema / minne のテスト用アカウント（本番と同等のフローが確認できるもの）。
 - **ログイン情報管理**: メールアドレス・パスワード、2段階認証コード取得手段（Authenticator／メールなど）。
 - **ターゲットページの調査**: ログインページ、商品登録フォーム、下書き保存ページのURLと遷移フロー。
