@@ -1,4 +1,9 @@
 import { expect, test } from "@playwright/test";
+import type { Page } from "@playwright/test";
+import { promises as fs } from "fs";
+import os from "os";
+import path from "path";
+import { randomUUID } from "crypto";
 import { googleSheetsProductRepository } from "@/adapters/google-sheets/product-repository";
 import type { SpreadsheetProductRecord } from "@/application/types/product";
 import {
@@ -26,13 +31,21 @@ const selectors = {
   priceInput: "#form-item-price",
   stockSelect: "select.js-attach-stock",
   materialSelect: "#form-item-material-id",
+  imageFileInput: "input.js-file-upload",
+  shippingOriginSelect: "select[name='item[delivery_from_prefecture_id]']",
+  shippingMethodSelect: "select[name='item[shipping_methods][]']",
+  craftPeriodSelect: "select[name='item[craft_period]']",
+  sizeTextarea: "#form-item-size-freeinput",
   categoryLevel1Select: "#form-item-level1-category-id",
   categoryLevel2Select: "#form-item-level2-category-id",
+  categoryLevel3Select: "#form-item-level3-category-id",
   colorCheckboxes: "input.js-item-skus-color-ids",
   categoryLevel1Select: "#form-item-level1-category-id",
   categoryLevel2Select: "#form-item-level2-category-id",
   tagHiddenInput: "#form-item-tags",
   nextStepButton: "input.js-item-next",
+  confirmButton: "input.js-item-confirm",
+  saveDraftButton: "input.js-item-form-draft",
 };
 
 const CREEMA_MATERIAL_OPTIONS = [
@@ -68,6 +81,69 @@ const CREEMA_MATERIAL_OPTIONS = [
 ];
 
 const MATERIAL_ALIAS_MAP = buildMaterialAliasMap(CREEMA_MATERIAL_OPTIONS);
+
+const PREFECTURE_ENTRIES: Array<{ id: string; labels: string[] }> = [
+  { id: "1", labels: ["北海道"] },
+  { id: "2", labels: ["青森県", "青森"] },
+  { id: "3", labels: ["岩手県", "岩手"] },
+  { id: "4", labels: ["宮城県", "宮城"] },
+  { id: "5", labels: ["秋田県", "秋田"] },
+  { id: "6", labels: ["山形県", "山形"] },
+  { id: "7", labels: ["福島県", "福島"] },
+  { id: "8", labels: ["茨城県", "茨城"] },
+  { id: "9", labels: ["栃木県", "栃木"] },
+  { id: "10", labels: ["群馬県", "群馬"] },
+  { id: "11", labels: ["埼玉県", "埼玉"] },
+  { id: "12", labels: ["千葉県", "千葉"] },
+  { id: "13", labels: ["東京都", "東京"] },
+  { id: "14", labels: ["神奈川県", "神奈川"] },
+  { id: "15", labels: ["新潟県", "新潟"] },
+  { id: "16", labels: ["富山県", "富山"] },
+  { id: "17", labels: ["石川県", "石川"] },
+  { id: "18", labels: ["福井県", "福井"] },
+  { id: "19", labels: ["山梨県", "山梨"] },
+  { id: "20", labels: ["長野県", "長野"] },
+  { id: "21", labels: ["岐阜県", "岐阜"] },
+  { id: "22", labels: ["静岡県", "静岡"] },
+  { id: "23", labels: ["愛知県", "愛知"] },
+  { id: "24", labels: ["三重県", "三重"] },
+  { id: "25", labels: ["滋賀県", "滋賀"] },
+  { id: "26", labels: ["京都府", "京都"] },
+  { id: "27", labels: ["大阪府", "大阪"] },
+  { id: "28", labels: ["兵庫県", "兵庫"] },
+  { id: "29", labels: ["奈良県", "奈良"] },
+  { id: "30", labels: ["和歌山県", "和歌山"] },
+  { id: "31", labels: ["鳥取県", "鳥取"] },
+  { id: "32", labels: ["島根県", "島根"] },
+  { id: "33", labels: ["岡山県", "岡山"] },
+  { id: "34", labels: ["広島県", "広島"] },
+  { id: "35", labels: ["山口県", "山口"] },
+  { id: "36", labels: ["徳島県", "徳島"] },
+  { id: "37", labels: ["香川県", "香川"] },
+  { id: "38", labels: ["愛媛県", "愛媛"] },
+  { id: "39", labels: ["高知県", "高知"] },
+  { id: "40", labels: ["福岡県", "福岡"] },
+  { id: "41", labels: ["佐賀県", "佐賀"] },
+  { id: "42", labels: ["長崎県", "長崎"] },
+  { id: "43", labels: ["熊本県", "熊本"] },
+  { id: "44", labels: ["大分県", "大分"] },
+  { id: "45", labels: ["宮崎県", "宮崎"] },
+  { id: "46", labels: ["鹿児島県", "鹿児島"] },
+  { id: "47", labels: ["沖縄県", "沖縄"] },
+  { id: "48", labels: ["その他"] },
+  { id: "49", labels: ["海外"] },
+];
+
+const PREFECTURE_ALIAS_MAP = buildPrefectureAliasMap(PREFECTURE_ENTRIES);
+
+const SHIPPING_METHOD_ENTRIES: Array<{ id: string; labels: string[] }> = [
+  { id: "1920251", labels: ["宅急便コンパクト", "ヤマト宅急便コンパクト"] },
+  { id: "1712550", labels: ["定形外郵便-100g以内（規格外）", "定形外郵便"] },
+  { id: "1717715", labels: ["送料無料", "送料無料（国内）", "送料無料(国内)"] },
+  { id: "1717714", labels: ["送料無料（海外）", "送料無料(海外)"] },
+];
+
+const SHIPPING_METHOD_ALIAS_MAP = buildShippingMethodAliasMap(SHIPPING_METHOD_ENTRIES);
 
 test.describe("Creema 自動化フロー", () => {
   test.skip(!RUN_CREEMA_FLOW, "PLAYWRIGHT_RUN_CREEMA=true を指定したときのみ実行します。");
@@ -122,21 +198,24 @@ test.describe("Creema 自動化フロー", () => {
     const mapped = mapProductToCreemaDraft(product!);
 
     await test.step("フォームに商品情報を入力", async () => {
+      if (mapped.imageUrls.length) {
+        await uploadImages(page, selectors.imageFileInput, mapped.imageUrls);
+      }
+
       await page.fill(selectors.titleInput, mapped.title);
       await page.fill(selectors.descriptionInput, mapped.description);
       await page.fill(selectors.priceInput, mapped.price);
       await page.selectOption(selectors.stockSelect, mapped.stock);
 
       if (mapped.materialId) {
-        console.log("[creema-draft] material resolved", mapped.materialId);
-        await page
-          .selectOption(selectors.materialSelect, mapped.materialId)
-          .catch(() => {
-            console.warn(
-              "[creema-draft] material option not selectable",
-              mapped.materialId
-            );
-          });
+        const materialSelect = page.locator(selectors.materialSelect);
+        await expect(materialSelect).toBeAttached();
+        await materialSelect.selectOption(mapped.materialId).catch(() => {
+          console.warn(
+            "[creema-draft] material option not selectable",
+            mapped.materialId
+          );
+        });
       } else {
         console.warn(
           "[creema-draft] material not resolved",
@@ -165,6 +244,21 @@ test.describe("Creema 自動化フロー", () => {
               mapped.categoryLevel2Id
             );
           });
+
+          if (mapped.categoryLevel3Id || mapped.categoryLevel3Label) {
+            const success = await setSelectValueByIdOrLabel(
+              page,
+              selectors.categoryLevel3Select,
+              mapped.categoryLevel3Id,
+              mapped.categoryLevel3Label
+            );
+            if (!success) {
+              console.warn(
+                "[creema-draft] level3 option not selectable",
+                mapped.categoryLevel3Id ?? mapped.categoryLevel3Label
+              );
+            }
+          }
         }
       }
 
@@ -176,34 +270,115 @@ test.describe("Creema 自動化フロー", () => {
         }
       }
 
-      if (mapped.tags.length) {
-        await page.evaluate(
-          ({ selector, tags }) => {
-            const input = document.querySelector<HTMLInputElement>(selector);
-            if (!input) {
-              console.warn("[creema-draft] タグ入力 hidden が見つかりません", selector);
-              return;
-            }
-            const serialized = tags.join(",");
-            input.value = serialized;
-            const eventInit = { bubbles: true, cancelable: true };
-            input.dispatchEvent(new Event("input", eventInit));
-            input.dispatchEvent(new Event("change", eventInit));
-          },
-          { selector: selectors.tagHiddenInput, tags: mapped.tags }
-        );
-      }
+      // キーワードタグの入力は一時停止（使用不可文字の検証後に再開）
 
       // TODO: 画像アップロードなど、Creema 固有の必須項目を追記
     });
 
-    await test.step("下書き保存直前で停止", async () => {
-      await expect(page.locator(selectors.nextStepButton)).toBeVisible();
+    await test.step("発送情報を入力", async () => {
+      await page.click(selectors.nextStepButton);
+
+      if (mapped.shippingOriginPrefectureId) {
+        const success = await setSelectValue(
+          page,
+          selectors.shippingOriginSelect,
+          mapped.shippingOriginPrefectureId
+        );
+        if (!success) {
+          console.warn(
+            "[creema-draft] shipping origin option not selectable",
+            mapped.shippingOriginPrefectureId
+          );
+        }
+      } else if (
+        pickFirstNonEmpty(
+          product!.raw["creema_shipping_origin_pref"],
+          product!.raw["shipping_origin_pref"],
+          product!.raw["発送元都道府県"],
+          product!.raw["発送元"]
+        )
+      ) {
+        console.warn("[creema-draft] shipping origin not resolved", product!.id);
+      }
+
+      if (mapped.shippingMethodId) {
+        const success = await setSelectValue(
+          page,
+          selectors.shippingMethodSelect,
+          mapped.shippingMethodId
+        );
+        if (!success) {
+          console.warn(
+            "[creema-draft] shipping method not selectable",
+            mapped.shippingMethodId
+          );
+        }
+      } else if (
+        pickFirstNonEmpty(
+          product!.raw["creema_shipping_method"],
+          product!.raw["shipping_method"],
+          product!.raw["配送方法"]
+        )
+      ) {
+        console.warn("[creema-draft] shipping method not resolved", product!.id);
+      }
+
+      if (mapped.craftPeriodId) {
+        const success = await setSelectValue(
+          page,
+          selectors.craftPeriodSelect,
+          mapped.craftPeriodId
+        );
+        if (!success) {
+          console.warn(
+            "[creema-draft] craft period not selectable",
+            mapped.craftPeriodId
+          );
+        }
+      } else if (
+        pickFirstNonEmpty(
+          product!.raw["creema_craft_period_id"],
+          product!.raw["production_lead_time_days"],
+          product!.raw["制作期間"]
+        )
+      ) {
+        console.warn("[creema-draft] craft period not resolved", product!.id);
+      }
+
+      if (mapped.sizeFreeInput) {
+        const success = await setTextareaValue(page, selectors.sizeTextarea, mapped.sizeFreeInput);
+        if (!success) {
+          console.warn("[creema-draft] size textarea not fillable", mapped.sizeFreeInput);
+        }
+      }
+    });
+
+    await test.step("入力内容を確認", async () => {
+      const confirmButton = page.locator(selectors.confirmButton);
+      await expect(confirmButton).toBeVisible();
+      await Promise.all([
+        page.waitForNavigation({ waitUntil: "load" }),
+        confirmButton.click(),
+      ]);
+      await expect(page).toHaveURL(/\/my\/item\/input\/preview/);
       testInfo.annotations.push({
         type: "NEXT",
         description:
-          "次のステップに進む場合は `page.click(selectors.nextStepButton)` を実行してください。",
+          "プレビューで内容を確認し、下書きを保存する場合は保存ボタンをクリックしてください。",
       });
+    });
+
+    await test.step("下書きを保存", async () => {
+      const saveButton = page
+        .locator(`${selectors.saveDraftButton}[value="保存する"]:visible`)
+        .first();
+      await expect(saveButton).toBeVisible();
+      await saveButton.scrollIntoViewIfNeeded();
+      await Promise.all([
+        page.waitForNavigation({ waitUntil: "load" }),
+        saveButton.click(),
+      ]);
+      await expect(page).toHaveURL(/\/my\/item\/list\?status=draft/);
     });
   });
 });
@@ -235,8 +410,15 @@ type CreemaDraftMapped = {
   stock: string;
   tags: string[];
   materialId: string | null;
+  imageUrls: string[];
+  shippingOriginPrefectureId: string | null;
+  shippingMethodId: string | null;
+  craftPeriodId: string | null;
+  sizeFreeInput: string | null;
   categoryLevel1Id: string | null;
   categoryLevel2Id: string | null;
+  categoryLevel3Id: string | null;
+  categoryLevel3Label: string | null;
   colorIds: string[];
 };
 
@@ -254,6 +436,47 @@ function mapProductToCreemaDraft(product: SpreadsheetProductRecord): CreemaDraft
       product.raw["素材"],
     ]
   );
+  const shippingOriginPrefectureId = resolvePrefectureId(
+    pickFirstNonEmpty(
+      product.raw["creema_shipping_origin_pref"],
+      product.raw["shipping_origin_pref"],
+      product.raw["発送元都道府県"],
+      product.raw["発送元"]
+    )
+  );
+
+  const shippingMethodId = resolveShippingMethodId(
+    pickFirstNonEmpty(
+      product.raw["creema_shipping_method"],
+      product.raw["shipping_method"],
+      product.raw["配送方法"]
+    )
+  );
+
+  const craftPeriodId = resolveCraftPeriodId(
+    parseInteger(
+      pickFirstNonEmpty(
+        product.raw["creema_craft_period_days"],
+        product.raw["production_lead_time_days"],
+        product.raw["制作期間"]
+      )
+    )
+  );
+
+  const sizeFreeInput = buildSizeFreeInput(
+    pickFirstNonEmpty(
+      product.raw["creema_size_free_input"],
+      product.raw["size_notes"],
+      product.raw["サイズ"]
+    ),
+    pickFirstNonEmpty(
+      product.raw["creema_weight_grams"],
+      product.raw["weight_grams"],
+      product.raw["重量"]
+    )
+  );
+  const imageUrls = parseImageUrls(product.raw["image_urls"]);
+
   const categoryPathFromSheet = pickFirstNonEmpty(
     product.raw["creema_category_path"],
     product.raw["creema_category"],
@@ -273,6 +496,11 @@ function mapProductToCreemaDraft(product: SpreadsheetProductRecord): CreemaDraft
     product.raw["creema_category_level2_label"],
     product.raw["creema_category_level2_name"],
     product.raw["creema_category_level2"]
+  );
+  const categoryLevel3Label = pickFirstNonEmpty(
+    product.raw["creema_category_level3_label"],
+    product.raw["creema_category_level3_name"],
+    product.raw["creema_category_level3"]
   );
 
   const resolvedCategoryPath = resolveCreemaCategoryPath(categoryPathFromSheet, {
@@ -326,6 +554,23 @@ function mapProductToCreemaDraft(product: SpreadsheetProductRecord): CreemaDraft
       categoryLevel2Id = resolvedCategoryPath.level2Id;
     }
   }
+
+  let categoryLevel3Id = normalizeId(
+    product.raw["creema_category3_id"] ??
+      product.raw["creema_subcategory2_id"] ??
+      product.raw["creema_category_level3_id"]
+  );
+  const categoryLevel3LabelResolved =
+    categoryLevel3Label ?? resolvedCategoryPath.level3Label ?? null;
+  if (categoryLevel3Id && !categoryLevel2Id) {
+    console.warn(
+      "[creema-draft] 第三階層カテゴリIDが設定されていますが第二階層が未確定です",
+      product.id,
+      categoryLevel3Id
+    );
+    categoryLevel3Id = null;
+  }
+
   const colorIds = parseColorIds(
     product.raw["creema_color_ids"] ?? product.raw["color_ids"] ?? ""
   );
@@ -337,8 +582,15 @@ function mapProductToCreemaDraft(product: SpreadsheetProductRecord): CreemaDraft
     stock: inventory.toString(),
     tags,
     materialId,
+    imageUrls,
+    shippingOriginPrefectureId,
+    shippingMethodId,
+    craftPeriodId,
+    sizeFreeInput,
     categoryLevel1Id,
     categoryLevel2Id,
+    categoryLevel3Id,
+    categoryLevel3Label: categoryLevel3LabelResolved,
     colorIds,
   };
 }
@@ -357,6 +609,220 @@ function parseColorIds(value: string): string[] {
     .filter(Boolean);
 }
 
+function parseImageUrls(value: string | null | undefined): string[] {
+  if (!value) return [];
+  return value
+    .split(/[\n,]+/)
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+}
+
+async function setSelectValue(page: Page, selector: string, value: string): Promise<boolean> {
+  if (!value) return false;
+  return page.evaluate(
+    ({ selector, value }) => {
+      const element = document.querySelector<HTMLSelectElement>(selector);
+      if (!element) return false;
+      const hasOption = Array.from(element.options).some((option) => option.value === value);
+      if (!hasOption) return false;
+      element.value = value;
+      const ev = { bubbles: true, cancelable: true };
+      element.dispatchEvent(new Event("input", ev));
+      element.dispatchEvent(new Event("change", ev));
+      return true;
+    },
+    { selector, value }
+  );
+}
+
+async function setSelectValueByIdOrLabel(
+  page: Page,
+  selector: string,
+  id: string | null,
+  label: string | null
+): Promise<boolean> {
+  if (!id && !label) return false;
+  const selectLocator = page.locator(selector);
+  if (!(await selectLocator.count())) return false;
+  await page
+    .waitForFunction(
+      (sel) => {
+        const element = document.querySelector<HTMLSelectElement>(sel);
+        return !!element && element.options.length > 1;
+      },
+      selector,
+      { timeout: 10_000 }
+    )
+    .catch(() => {});
+
+  return page.evaluate(
+    ({ selector, id, label }) => {
+      const element = document.querySelector<HTMLSelectElement>(selector);
+      if (!element) return false;
+      const style = window.getComputedStyle(element);
+      if (style.display === "none" || style.visibility === "hidden") {
+        element.classList.remove("u-hide");
+        element.style.display = "";
+        element.removeAttribute("style");
+      }
+      const options = Array.from(element.options);
+      let targetValue: string | null = null;
+      if (id && options.some((option) => option.value === id)) {
+        targetValue = id;
+      } else if (label) {
+        const normalizedLabel = label.trim();
+        const matched = options.find((option) =>
+          (option.textContent ?? "").trim() === normalizedLabel
+        );
+        if (matched) {
+          targetValue = matched.value;
+        }
+      }
+      if (!targetValue) return false;
+      element.value = targetValue;
+      const ev = { bubbles: true, cancelable: true };
+      element.dispatchEvent(new Event("input", ev));
+      element.dispatchEvent(new Event("change", ev));
+      return true;
+    },
+    { selector, id, label }
+  );
+}
+
+async function setTextareaValue(page: Page, selector: string, value: string): Promise<boolean> {
+  if (!value) return false;
+  return page.evaluate(
+    ({ selector, value }) => {
+      const element = document.querySelector<HTMLTextAreaElement>(selector);
+      if (!element) return false;
+      element.value = value;
+      const ev = { bubbles: true, cancelable: true };
+      element.dispatchEvent(new Event("input", ev));
+      element.dispatchEvent(new Event("change", ev));
+      return true;
+    },
+    { selector, value }
+  );
+}
+
+async function uploadImages(page: Page, selector: string, urls: string[]): Promise<void> {
+  const normalized = Array.from(new Set(urls.filter(Boolean))).slice(0, 10);
+  if (!normalized.length) return;
+  console.log("[creema-draft] image upload start", normalized);
+  const files = await downloadImages(normalized);
+  console.log("[creema-draft] image downloaded", files);
+  if (!files.length) return;
+  try {
+    await expect(page.locator(selector)).toBeAttached();
+    await page.setInputFiles(selector, files);
+    await waitForImagePreview(page, files.length);
+    console.log("[creema-draft] image upload completed", files);
+  } catch (error) {
+    console.warn("[creema-draft] image upload failed", error);
+  } finally {
+    await Promise.all(
+      files.map((file) =>
+        fs
+          .unlink(file)
+          .catch((unlinkError) => console.warn("[creema-draft] temp image cleanup failed", file, unlinkError))
+      )
+    );
+  }
+}
+
+async function downloadImages(urls: string[]): Promise<string[]> {
+  const results: string[] = [];
+  for (const url of urls) {
+    try {
+      const response = await fetch(url);
+      if (!response.ok) {
+        console.warn("[creema-draft] image download failed", url, response.status);
+        continue;
+      }
+      const arrayBuffer = await response.arrayBuffer();
+      const ext = (() => {
+        try {
+          const pathname = new URL(url).pathname;
+          const candidate = path.extname(pathname);
+          return candidate || ".jpg";
+        } catch {
+          return ".jpg";
+        }
+      })();
+      const tempPath = path.join(os.tmpdir(), `creema-image-${randomUUID()}${ext}`);
+      await fs.writeFile(tempPath, Buffer.from(arrayBuffer));
+      console.log("[creema-draft] image saved", url, tempPath, arrayBuffer.byteLength);
+      results.push(tempPath);
+    } catch (error) {
+      console.warn("[creema-draft] image download failed", url, error);
+    }
+  }
+  return results;
+}
+
+async function waitForImagePreview(page: Page, expectedCount: number): Promise<void> {
+  try {
+    const preview = page.locator("#js-preview-item-image");
+    await preview.waitFor({ state: "visible", timeout: 15_000 });
+    const previewItems = preview.locator(".p-item-preview-images__media, .p-item-preview-images__seed");
+    await expect(previewItems).toHaveCount(expectedCount, { timeout: 15_000 });
+  } catch (error) {
+    console.warn("[creema-draft] image preview wait failed", error);
+  }
+}
+
+function resolvePrefectureId(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const normalized = normalizePrefectureToken(value);
+  return PREFECTURE_ALIAS_MAP.get(normalized) ?? null;
+}
+
+function resolveShippingMethodId(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const normalized = normalizeShippingMethodToken(value);
+  const matches = SHIPPING_METHOD_ALIAS_MAP.get(normalized);
+  if (!matches || matches.length === 0) return null;
+  return matches[0];
+}
+
+function resolveCraftPeriodId(days: number | null): string | null {
+  if (days == null || !Number.isFinite(days)) return null;
+  const normalizedDays = Math.max(1, Math.ceil(days));
+  if (normalizedDays <= 90) {
+    return String(normalizedDays);
+  }
+  const extended = [100, 110, 120, 130, 140, 150, 160, 170, 180];
+  for (const candidate of extended) {
+    if (normalizedDays <= candidate) {
+      return String(candidate);
+    }
+  }
+  return String(extended[extended.length - 1]);
+}
+
+function buildSizeFreeInput(
+  sizeNotes: string | null | undefined,
+  weightGrams: string | null | undefined
+): string | null {
+  const parts: string[] = [];
+  if (sizeNotes && sizeNotes.trim()) {
+    parts.push(sizeNotes.trim());
+  }
+  const weightValue = parseInteger(weightGrams);
+  if (weightValue !== null) {
+    parts.push(`重量: ${weightValue}g`);
+  }
+  return parts.length ? parts.join("\n") : null;
+}
+
+function parseInteger(value: string | null | undefined): number | null {
+  if (!value) return null;
+  const sanitized = value.replace(/[^0-9.+-]/g, "");
+  if (!sanitized.length) return null;
+  const parsed = Number.parseFloat(sanitized);
+  return Number.isFinite(parsed) ? Math.round(parsed) : null;
+}
+
 function pickFirstNonEmpty(
   ...values: Array<string | null | undefined>
 ): string | null {
@@ -366,6 +832,54 @@ function pickFirstNonEmpty(
     }
   }
   return null;
+}
+
+function buildPrefectureAliasMap(
+  entries: Array<{ id: string; labels: string[] }>
+): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const entry of entries) {
+    for (const label of entry.labels) {
+      const normalized = normalizePrefectureToken(label);
+      if (!normalized) continue;
+      map.set(normalized, entry.id);
+    }
+  }
+  return map;
+}
+
+function normalizePrefectureToken(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[\s　]/g, "")
+    .replace(/[都道府県]/g, "");
+}
+
+function buildShippingMethodAliasMap(
+  entries: Array<{ id: string; labels: string[] }>
+): Map<string, string[]> {
+  const map = new Map<string, string[]>();
+  for (const entry of entries) {
+    for (const label of entry.labels) {
+      const normalized = normalizeShippingMethodToken(label);
+      if (!normalized) continue;
+      const existing = map.get(normalized) ?? [];
+      if (!existing.includes(entry.id)) {
+        existing.push(entry.id);
+      }
+      map.set(normalized, existing);
+    }
+  }
+  return map;
+}
+
+function normalizeShippingMethodToken(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[\s　]/g, "")
+    .replace(/[（）()]/g, "");
 }
 
 function resolveMaterialId(

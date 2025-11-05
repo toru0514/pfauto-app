@@ -326,7 +326,7 @@ export function isValidCreemaLevel2CategoryId(
 export function resolveCreemaCategoryPath(
   rawPath: string | null | undefined,
   options: ResolveOptions = {}
-): { level1Id: string | null; level2Id: string | null } {
+): { level1Id: string | null; level2Id: string | null; level3Label: string | null } {
   const tokens = (rawPath ?? "")
     .split(CATEGORY_PATH_SPLIT_PATTERN)
     .map((token) => sanitizeToken(token))
@@ -345,7 +345,7 @@ export function resolveCreemaCategoryPath(
         primaryLevel1Label
       );
     }
-    return { level1Id: null, level2Id: null };
+    return { level1Id: null, level2Id: null, level3Label: null };
   }
 
   const level2Map = LEVEL2_ALIAS_MAP.get(level1.id);
@@ -385,7 +385,9 @@ export function resolveCreemaCategoryPath(
     }
   }
 
-  return { level1Id: level1.id, level2Id: level2?.id ?? null };
+  const level3Label = tokens[2] ?? null;
+
+  return { level1Id: level1.id, level2Id: level2?.id ?? null, level3Label };
 }
 
 function buildAliasMap<T extends { label: string }>(nodes: T[]): AliasMap<T> {

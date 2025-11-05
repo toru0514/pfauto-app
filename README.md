@@ -242,32 +242,34 @@ Creema / minne 双方の要件を満たすために、シート上では両PFの
 | `price` | number | 税込価格（円） | PFの最低価格要件を事前に満たすこと |
 | `inventory` | number | 在庫数 | minne 必須、Creema 任意 |
 | `material` | string | 素材・材料 | Creema 必須。複数素材はカンマ区切り。主要語から自動で Creema 素材ID を推測するが、曖昧な場合は `creema_material_id` を併記 |
-| `size_notes` | string | サイズ/寸法 | cm表記を基本とし、自由記述可 |
-| `weight_grams` | number | 重量（g） | 配送方法判定に利用 |
+| `size_notes` | string | サイズ/寸法 | cm表記を基本とし、自由記述可。Creema では `size_notes` と `weight_grams` から「サイズ・重量」欄に転記される |
+| `weight_grams` | number | 重量（g） | 配送方法判定や Creema のサイズ入力に利用 |
 | `tags` | comma separated | キーワードタグ | PFごとの上限をバリデーション |
 | `creema_category_level1_label` | string (data validation) | Creema 第一階層カテゴリ名 | README 付録の一覧からプルダウン選択 |
 | `creema_category_level2_label` | string (data validation) | Creema 第二階層カテゴリ名 | 第一階層に対応する候補から選択 |
+| `creema_category_level3_label` | string (data validation) | Creema 第三階層カテゴリ名 | 第二階層を選択後に表示される候補名を入力（該当がない場合は空欄） |
 | `category_common` | string | 共通カテゴリラベル | 内部管理用。必要に応じて PF 横断の分類に利用 |
 | `image_urls` | newline separated | 画像URLのリスト | 上から順にアップロード。最大枚数はPFで制御 |
 | `variant_options` | JSON string | バリエーション構成 | minne のオプション入力に対応。Creemaは任意 |
 | `production_lead_time_days` | number | 制作期間（日） | 両PFで指定可能 |
 | `shipping_fee` | number | 送料（円） | minne 必須。Creema は配送プロファイル利用時に参照 |
-| `shipping_method` | string | 配送方法 | プルダウン項目を想定。PF固有マッピングあり |
+| `shipping_method` | string | 配送方法 | Creema では `宅急便コンパクト` / `定形外郵便-100g以内（規格外）` / `送料無料` などテンプレート名称と一致させる |
+| `creema_color_ids` | string | Creema カラーID | 「白=1, 黒=2, …, 柄もの=15」をカンマ区切りで入力 |
 | `shipping_origin_pref` | string | 発送元都道府県 | 両PF必須 |
 | `available_platforms` | string | 出品対象PF (`creema|minne|both`) | 対象PFフィルタに利用 |
 | `notes_internal` | string | 運用メモ | 自動化ロジックは参照しない |
 
 #### PF固有列
-- `creema_category_id`, `creema_category2_id`, `creema_material_id`, `creema_shipping_profile_id`, `creema_handling_time_days`, `creema_shop_section`: Creema 専用列。カテゴリ ID / 素材 ID 列は実 ID（数値）を入力し、ラベル列と整合させる（ラベルに合わせて VLOOKUP や Apps Script で自動入力する運用を推奨）。未設定・不整合の場合は自動化が警告を出してスキップする。
+- `creema_category_id`, `creema_category2_id`, `creema_category3_id`, `creema_material_id`, `creema_shipping_profile_id`, `creema_handling_time_days`, `creema_shop_section`: Creema 専用列。カテゴリ / 素材 ID は実 ID を入力し、発送元都道府県（`shipping_origin_pref`）・配送方法（`shipping_method`）・発送までの日数 (`production_lead_time_days`) はシートの文字列から自動マッピングされる。未対応の値は警告ログを出し、手動で補正する。
 - `minne_category_id`, `minne_shipping_method_id`, `minne_shipping_fee_code`, `minne_required_options`: minne 専用列。空欄の場合は同期対象から除外するか、バリデーションで警告を返す。
 - PF固有列は `<pf>_<domain>_<name>` 命名を基本とし、追加PFにも拡張しやすいよう運用する。
 
 #### スプレッドシートテンプレート（例）
 ```text
-product_id | sku | title | description | price | inventory | material | size_notes | weight_grams | tags | creema_category_level1_label | creema_category_level2_label | creema_category_id | creema_category2_id | category_common | image_urls | variant_options | production_lead_time_days | shipping_fee | shipping_method | shipping_origin_pref | 出品先 | ステータス | minne_category_id | notes_internal
-hand-001   | HM-001 | 春色ブーケピアス | 淡いカラーの花をモチーフにした揺れるタイプのピアス。金具はステンレス製で肌にやさしい仕上げです。 | 3500 | 5 | 真鍮,ガラス | 全長約3cm | 12 | ピアス,春,花 | アクセサリー・ジュエリー | ピアス | 2 | 216 | アクセサリー/ピアス | https://example.com/images/hand-001-main.jpg | {"option":"カラー","values":["ピンク","ブルー"]} | 7 | 250 | ゆうパケット | 東京都 | creema,minne | 下書き準備済み | 7890 | 母の日特集向けアイテム。
-hand-002   | HM-002 | 木製カトラリーセット | 国産材を使ったスプーンとフォークの2本セット。オイル仕上げでお手入れも簡単です。 | 2800 | 10 | サクラ材 | スプーン/フォーク 各16cm | 80 | カトラリー,木製,ギフト | 食器・キッチン | 箸・カトラリー | 14 | 241 | キッチン/カトラリー | https://example.com/images/hand-002-main.jpg |  | 5 | 520 | 宅急便コンパクト | 埼玉県 | minne | 下書き準備済み | 4521 | minne限定。
-hand-003   | HM-003 | レザーコードブレスレット | しなやかな本革コードを編み込んだブレスレット。マグネット金具で着脱も簡単です。 | 4200 | 8 | 本革,真鍮 | 内周約17cm | 25 | ブレスレット,ユニセックス,ギフト | アクセサリー・ジュエリー | ブレスレット・バングル | 2 | 65 | アクセサリー/ブレスレット | https://example.com/images/hand-003-main.jpg | {"option":"サイズ","values":["S","M","L"]} | 10 | 370 | レターパックライト | 神奈川県 | creema | 下書き準備済み |  | 父の日ギフト候補。
+product_id | sku | title | description | price | inventory | material | size_notes | weight_grams | tags | creema_category_level1_label | creema_category_level2_label | creema_category_level3_label | creema_category_id | creema_category2_id | creema_category3_id | category_common | image_urls | creema_color_ids | variant_options | production_lead_time_days | shipping_fee | shipping_method | shipping_origin_pref | 出品先 | ステータス | minne_category_id | notes_internal
+hand-001   | HM-001 | 春色ブーケピアス | 淡いカラーの花をモチーフにした揺れるタイプのピアス。金具はステンレス製で肌にやさしい仕上げです。 | 3500 | 5 | 真鍮,ガラス | 全長約3cm | 12 | ピアス,春,花 | アクセサリー・ジュエリー | ピアス | ピアス（フック・チェーン） | 2 | 216 | 73 | アクセサリー/ピアス | https://example.com/images/hand-001-main.jpg | 10 | {"option":"カラー","values":["ピンク","ブルー"]} | 7 | 250 | ゆうパケット | 東京都 | creema,minne | 下書き準備済み | 7890 | 母の日特集向けアイテム。
+hand-002   | HM-002 | 木製カトラリーセット | 国産材を使ったスプーンとフォークの2本セット。オイル仕上げでお手入れも簡単です。 | 2800 | 10 | サクラ材 | スプーン/フォーク 各16cm | 80 | カトラリー,木製,ギフト | 食器・キッチン | 箸・カトラリー |  | 14 | 241 |  | キッチン/カトラリー | https://example.com/images/hand-002-main.jpg | 4 |  | 5 | 520 | 宅急便コンパクト | 埼玉県 | minne | 下書き準備済み | 4521 | minne限定。
+hand-003   | HM-003 | レザーコードブレスレット | しなやかな本革コードを編み込んだブレスレット。マグネット金具で着脱も簡単です。 | 4200 | 8 | 本革,真鍮 | 内周約17cm | 25 | ブレスレット,ユニセックス,ギフト | アクセサリー・ジュエリー | ブレスレット・バングル |  | 2 | 65 |  | アクセサリー/ブレスレット | https://example.com/images/hand-003-main.jpg | 14 | {"option":"サイズ","values":["S","M","L"]} | 10 | 370 | レターパックライト | 神奈川県 | creema | 下書き準備済み |  | 父の日ギフト候補。
 ```
 
 #### 入力ルール
