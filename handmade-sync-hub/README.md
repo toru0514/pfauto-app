@@ -16,6 +16,30 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
+## Development Workflow
+
+### Local development
+1. Copy `.env.example` to `.env.local` and fill in the required environment variables (see project root README for details).
+2. Install dependencies: `npm install`
+3. Start the dev server: `npm run dev`
+
+### Production build
+```bash
+npm run build
+npm run start
+```
+
+### Creema automation tests
+- Ensure `.env.local` has valid `PLAYWRIGHT_CREEMA_EMAIL` / `PLAYWRIGHT_CREEMA_PASSWORD` and `PLAYWRIGHT_RUN_CREEMA=true`.
+- Normal run:
+  ```bash
+  npx playwright test playwright/tests/creema-draft.spec.ts
+  ```
+- Debug run (opens Playwright Inspector; add `--headed` if you also want a browser window):
+  ```bash
+  npx playwright test playwright/tests/creema-draft.spec.ts --debug
+  ```
+
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
