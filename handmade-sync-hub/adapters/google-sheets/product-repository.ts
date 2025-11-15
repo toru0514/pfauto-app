@@ -11,6 +11,64 @@ import type { JobStatus, ProductStatus } from "@/application/types/status";
 
 const DEFAULT_SHEET_TITLE = "シート1";
 const VALUE_RANGE = "A1:ZZ"; // covers columns A-ZZ (~702 columns)
+const MOCK_SHEET_MATRIX: SheetMatrix = {
+  headerRow: [
+    "product_id",
+    "title",
+    "description",
+    "price",
+    "inventory",
+    "tags",
+    "出品先",
+    "ステータス",
+    "最終同期",
+    "エラーメモ",
+    "creema_status",
+    "creema_last_synced_at",
+    "creema_last_error",
+    "minne_status",
+    "minne_last_synced_at",
+    "minne_last_error",
+  ],
+  rows: [
+    [
+      "demo-1",
+      "Creema向けリング",
+      "Creema 自動化のスモークテスト用レコードです。",
+      "3500",
+      "5",
+      "リング,シルバー",
+      "Creema,Minne",
+      "下書き準備済み",
+      "2024-11-01 10:00",
+      "",
+      "processing",
+      "2024-10-31 22:00",
+      "",
+      "queued",
+      "",
+      "",
+    ],
+    [
+      "demo-2",
+      "Minne向けピアス",
+      "CI スモークテストで一覧に表示される確認用データです。",
+      "4200",
+      "8",
+      "ピアス,ゴールド",
+      "Minne",
+      "エラー",
+      "2024-10-20 09:30",
+      "画像URLが不足しています",
+      "",
+      "",
+      "",
+      "error",
+      "2024-10-19 18:20",
+      "一時的なエラー",
+    ],
+  ],
+};
 
 const PRODUCT_STATUS_ALIASES: Record<ProductStatus, string[]> = {
   new: ["new", "新規"],
@@ -52,6 +110,17 @@ type SheetMatrix = {
 };
 
 let cachedSheetsClient: sheets_v4.Sheets | null = null;
+
+function shouldUseMockSheetData(): boolean {
+  return process.env.USE_MOCK_SHEETS_DATA === "true";
+}
+
+function getMockSheetMatrix(): SheetMatrix {
+  return {
+    headerRow: [...MOCK_SHEET_MATRIX.headerRow],
+    rows: MOCK_SHEET_MATRIX.rows.map((row) => [...row]),
+  };
+}
 
 function getSheetsClient(): sheets_v4.Sheets {
   if (cachedSheetsClient) return cachedSheetsClient;
@@ -298,6 +367,13 @@ export class GoogleSheetsProductRepository implements ProductRepositoryPort {
   }
 
   async updateProductStatuses(input: UpdateProductStatusInput): Promise<void> {
+    if (shouldUseMockSheetData()) {
+      console.warn(
+        "[googleSheetsProductRepository] USE_MOCK_SHEETS_DATA=true のため updateProductStatuses をスキップしました。"
+      );
+      return;
+    }
+
     const matrix = await this.fetchSheetMatrix();
     if (!matrix) return;
     const { headerRow, rows } = matrix;
@@ -418,6 +494,10 @@ export class GoogleSheetsProductRepository implements ProductRepositoryPort {
   }
 
   private async fetchSheetMatrix(): Promise<SheetMatrix | null> {
+    if (shouldUseMockSheetData()) {
+      return getMockSheetMatrix();
+    }
+
     const sheets = getSheetsClient();
     const spreadsheetId = getSpreadsheetId();
     const sheetTitle = getSheetTitle();
