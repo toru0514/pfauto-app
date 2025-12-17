@@ -44,6 +44,7 @@ npm run start
 
 #### BASE
 - Ensure `.env.local` has valid `PLAYWRIGHT_BASE_EMAIL` / `PLAYWRIGHT_BASE_PASSWORD` and `PLAYWRIGHT_RUN_BASE=true`.
+- Test data comes from Google Sheets via `出品先` 列に `base` を含み、`ステータス` が `ready / 下書き準備済み` の行です (画像URLは `base_image_urls` または `image_urls` を参照)。
 - The login endpoint is `https://admin.thebase.com/users/login`.
 - Recommended flow (manual-assisted):
   1. Run the test in debug mode to allow manual input:
@@ -61,6 +62,15 @@ npm run start
 - Debug run:
   ```bash
   npx playwright test playwright/tests/base-draft.spec.ts --debug
+  ```
+
+#### Minne
+- Ensure `.env.local` has valid `PLAYWRIGHT_MINNE_EMAIL` and `PLAYWRIGHT_RUN_MINNE=true`.
+- Login is handled via magic-link email. The script will pause after sending the link—open the email manually, complete the login in your browser, then press “Resume” in Playwright Inspector.
+- Sheets rows with `出品先` containing `minne` and `ステータス=ready` are targeted. Parent/child category IDs (`minne_category_parent_id`, `minne_category_id`) and shipping columns (`minne_shipping_method`, `minne_shipping_area`, etc.) must be filled.
+- Debug run:
+  ```bash
+  PLAYWRIGHT_RUN_MINNE=true npx playwright test playwright/tests/minne-draft.spec.ts --debug
   ```
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.

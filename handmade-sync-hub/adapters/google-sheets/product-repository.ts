@@ -102,7 +102,7 @@ const HEADER_ALIASES = {
   note: ["notes_internal", "メモ", "note"],
 };
 
-const PLATFORM_PREFIXES = ["creema", "minne"];
+const PLATFORM_PREFIXES = ["creema", "minne", "base"];
 
 type SheetMatrix = {
   headerRow: string[];
