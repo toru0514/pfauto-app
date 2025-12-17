@@ -38,11 +38,12 @@ test.describe("minne 自動化フロー", () => {
     const minneEmail = process.env.PLAYWRIGHT_MINNE_EMAIL;
     test.skip(!minneEmail, "PLAYWRIGHT_MINNE_EMAIL を設定してください。");
 
-    const product = await pickProductForMinne();
-    console.log("[minne-draft] product found?", Boolean(product), product?.id);
-    test.skip(!product, "minne 対象のシート商品が見つかりませんでした。");
-
-    const mapped = mapProductToMinneDraft(product!);
+    const products = await listProductsForMinne();
+    console.log(
+      "[minne-draft] ready products",
+      products.map((p) => p.id)
+    );
+    test.skip(!products.length, "minne 対象のシート商品が見つかりませんでした。");
 
     await test.step("ログインリンクを送信", async () => {
       await page.goto(MINNE_LOGIN_URL, { waitUntil: "domcontentloaded" });
@@ -61,13 +62,12 @@ test.describe("minne 自動化フロー", () => {
       await expect(page).toHaveURL(/\/account/);
     });
 
-    await test.step("作品登録画面を開く", async () => {
-      await page.goto(MINNE_NEW_PRODUCT_URL, { waitUntil: "domcontentloaded" });
-      await expect(page).toHaveURL(/\/account\/products\/new/);
-    });
-
-    await test.step("フォームに商品情報を入力", async () => {
-      await page.fill(selectors.titleInput, mapped.title);
+    for (const product of products) {
+      const mapped = mapProductToMinneDraft(product);
+      await test.step(`作品 ${product.id} の入力`, async () => {
+        await page.goto(MINNE_NEW_PRODUCT_URL, { waitUntil: "domcontentloaded" });
+        await expect(page).toHaveURL(/\/account\/products\/new/);
+        await page.fill(selectors.titleInput, mapped.title);
 
       if (mapped.categoryParentId) {
         await page.selectOption(selectors.categoryParentSelect, mapped.categoryParentId).catch(() => {
@@ -126,20 +126,19 @@ test.describe("minne 自動化フロー", () => {
       if (mapped.shippingFee) {
         await page.fill(selectors.shippingFeeInput, mapped.shippingFee);
       }
-      if (mapped.shippingAdditionalFee) {
-        await page.fill(selectors.shippingAdditionalFeeInput, mapped.shippingAdditionalFee);
-      }
-    });
+        if (mapped.shippingAdditionalFee) {
+          await page.fill(selectors.shippingAdditionalFeeInput, mapped.shippingAdditionalFee);
+        }
 
-    await test.step("登録ボタンをクリック", async () => {
-      const submitButton = page.locator(selectors.submitButton).first();
-      await expect(submitButton).toBeVisible();
-      await submitButton.scrollIntoViewIfNeeded();
-      await submitButton.click();
-      await expect(page.locator(selectors.flashSuccess)).toContainText("作品", {
-        timeout: 15_000,
+        const submitButton = page.locator(selectors.submitButton).first();
+        await expect(submitButton).toBeVisible();
+        await submitButton.scrollIntoViewIfNeeded();
+        await submitButton.click();
+        await expect(page.locator(selectors.flashSuccess)).toContainText("作品", {
+          timeout: 15_000,
+        });
       });
-    });
+    }
   });
 });
 
@@ -158,18 +157,16 @@ type MinneDraftMapped = {
   imageUrls: string[];
 };
 
-async function pickProductForMinne(): Promise<SpreadsheetProductRecord | null> {
+async function listProductsForMinne(): Promise<SpreadsheetProductRecord[]> {
   const products = await googleSheetsProductRepository.listProducts();
   console.log("[minne-draft] fetched products", products.length);
   for (const p of products) {
     console.log("[minne-draft] candidate", p.id, p.platforms, p.syncStatus);
   }
-  return (
-    products.find(
-      (product) =>
-        product.platforms.some((platform) => platform.toLowerCase() === "minne") &&
-        product.syncStatus === "ready"
-    ) ?? null
+  return products.filter(
+    (product) =>
+      product.platforms.some((platform) => platform.toLowerCase() === "minne") &&
+      product.syncStatus === "ready"
   );
 }
 

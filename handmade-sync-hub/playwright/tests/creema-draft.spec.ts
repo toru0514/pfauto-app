@@ -159,13 +159,12 @@ test.describe("Creema 自動化フロー", () => {
 
     test.skip(!email || !password, "PLAYWRIGHT_CREEMA_EMAIL / PASSWORD を設定してください。");
 
-    const product = await pickProductForCreema();
+    const products = await listProductsForCreema();
     console.log(
-      "[creema-draft] product found?",
-      Boolean(product),
-      product?.id
+      "[creema-draft] ready products",
+      products.map((p) => p.id)
     );
-    test.skip(!product, "Creema 対象のシート商品が見つかりませんでした。");
+    test.skip(!products.length, "Creema 対象のシート商品が見つかりませんでした。");
 
     testInfo.annotations.push({
       type: "TODO",
@@ -195,9 +194,12 @@ test.describe("Creema 自動化フロー", () => {
       await expect(page).toHaveURL(/\/my\/item\/create/);
     });
 
-    const mapped = mapProductToCreemaDraft(product!);
+    for (const product of products) {
+      const mapped = mapProductToCreemaDraft(product);
 
-    await test.step("フォームに商品情報を入力", async () => {
+      await test.step(`フォームに商品情報を入力 (${product.id})`, async () => {
+        await page.goto(`${baseURL ?? "https://www.creema.jp"}${CREEMA_NEW_ITEM_PATH}`);
+        await expect(page).toHaveURL(/\/my\/item\/create/);
       if (mapped.imageUrls.length) {
         await uploadImages(page, selectors.imageFileInput, mapped.imageUrls);
       }
@@ -351,39 +353,35 @@ test.describe("Creema 自動化フロー", () => {
           console.warn("[creema-draft] size textarea not fillable", mapped.sizeFreeInput);
         }
       }
-    });
+        const confirmButton = page.locator(selectors.confirmButton);
+        await expect(confirmButton).toBeVisible();
+        await Promise.all([
+          page.waitForNavigation({ waitUntil: "load" }),
+          confirmButton.click(),
+        ]);
+        await expect(page).toHaveURL(/\/my\/item\/input\/preview/);
+        testInfo.annotations.push({
+          type: "NEXT",
+          description:
+            "プレビューで内容を確認し、下書きを保存する場合は保存ボタンをクリックしてください。",
+        });
 
-    await test.step("入力内容を確認", async () => {
-      const confirmButton = page.locator(selectors.confirmButton);
-      await expect(confirmButton).toBeVisible();
-      await Promise.all([
-        page.waitForNavigation({ waitUntil: "load" }),
-        confirmButton.click(),
-      ]);
-      await expect(page).toHaveURL(/\/my\/item\/input\/preview/);
-      testInfo.annotations.push({
-        type: "NEXT",
-        description:
-          "プレビューで内容を確認し、下書きを保存する場合は保存ボタンをクリックしてください。",
+        const saveButton = page
+          .locator(`${selectors.saveDraftButton}[value="保存する"]:visible`)
+          .first();
+        await expect(saveButton).toBeVisible();
+        await saveButton.scrollIntoViewIfNeeded();
+        await Promise.all([
+          page.waitForNavigation({ waitUntil: "load" }),
+          saveButton.click(),
+        ]);
+        await expect(page).toHaveURL(/\/my\/item\/list\?status=draft/);
       });
-    });
-
-    await test.step("下書きを保存", async () => {
-      const saveButton = page
-        .locator(`${selectors.saveDraftButton}[value="保存する"]:visible`)
-        .first();
-      await expect(saveButton).toBeVisible();
-      await saveButton.scrollIntoViewIfNeeded();
-      await Promise.all([
-        page.waitForNavigation({ waitUntil: "load" }),
-        saveButton.click(),
-      ]);
-      await expect(page).toHaveURL(/\/my\/item\/list\?status=draft/);
-    });
+    }
   });
 });
 
-async function pickProductForCreema(): Promise<SpreadsheetProductRecord | null> {
+async function listProductsForCreema(): Promise<SpreadsheetProductRecord[]> {
   const products = await googleSheetsProductRepository.listProducts();
   console.log("[creema-draft] fetched products", products.length);
   for (const p of products) {
@@ -394,12 +392,10 @@ async function pickProductForCreema(): Promise<SpreadsheetProductRecord | null> 
       p.syncStatus
     );
   }
-  return (
-    products.find(
-      (product) =>
-        product.platforms.some((platform) => platform.toLowerCase() === "creema") &&
-        product.syncStatus === "ready"
-    ) ?? null
+  return products.filter(
+    (product) =>
+      product.platforms.some((platform) => platform.toLowerCase() === "creema") &&
+      product.syncStatus === "ready"
   );
 }
 

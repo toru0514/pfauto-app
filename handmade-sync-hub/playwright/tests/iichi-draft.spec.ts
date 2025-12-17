@@ -37,11 +37,9 @@ test.describe("iichi 自動化フロー", () => {
     const password = process.env.PLAYWRIGHT_IICHI_PASSWORD;
     test.skip(!email || !password, "PLAYWRIGHT_IICHI_EMAIL / PLAYWRIGHT_IICHI_PASSWORD を設定してください。");
 
-    const product = await pickProductForIichi();
-    console.log("[iichi-draft] product found?", Boolean(product), product?.id);
-    test.skip(!product, "iichi 対象のシート商品が見つかりませんでした。");
-
-    const mapped = mapProductToIichiDraft(product!);
+    const products = await listProductsForIichi();
+    console.log("[iichi-draft] ready products", products.map((p) => p.id));
+    test.skip(!products.length, "iichi 対象のシート商品が見つかりませんでした。");
 
     await test.step("トップページからログインへ遷移", async () => {
       await page.goto(IICHI_ROOT_URL, { waitUntil: "domcontentloaded" });
@@ -81,15 +79,16 @@ test.describe("iichi 自動化フロー", () => {
       });
     });
 
-    await test.step("マイページ・作品登録画面を開く", async () => {
-      await page.goto(`${IICHI_ROOT_URL}${IICHI_ACCOUNT_PATH}`, { waitUntil: "domcontentloaded" });
-      await expect(page).toHaveURL(new RegExp(`${IICHI_ACCOUNT_PATH.replace(/\//g, "\\/")}`));
-      await page.goto(`${IICHI_ROOT_URL}${IICHI_NEW_ITEM_PATH}`, { waitUntil: "domcontentloaded" });
-      await expect(page).toHaveURL(new RegExp(`${IICHI_NEW_ITEM_PATH.replace(/\//g, "\\/")}`));
-    });
+    for (const product of products) {
+      const mapped = mapProductToIichiDraft(product);
 
-    await test.step("フォームに商品情報を入力", async () => {
-      await page.fill(selectors.titleInput, mapped.title);
+      await test.step(`作品 ${product.id} の登録`, async () => {
+        await page.goto(`${IICHI_ROOT_URL}${IICHI_ACCOUNT_PATH}`, { waitUntil: "domcontentloaded" });
+        await expect(page).toHaveURL(new RegExp(`${IICHI_ACCOUNT_PATH.replace(/\//g, "\\/")}`));
+        await page.goto(`${IICHI_ROOT_URL}${IICHI_NEW_ITEM_PATH}`, { waitUntil: "domcontentloaded" });
+        await expect(page).toHaveURL(new RegExp(`${IICHI_NEW_ITEM_PATH.replace(/\//g, "\\/")}`));
+
+        await page.fill(selectors.titleInput, mapped.title);
       await page.fill(selectors.descriptionTextarea, mapped.description);
       await page.fill(selectors.priceInput, mapped.price);
       await page.fill(selectors.stockInput, mapped.stock);
@@ -108,54 +107,57 @@ test.describe("iichi 自動化フロー", () => {
         }
       }
 
-      if (mapped.materialLabel) {
-        const materialSelected = await selectDropdownByLabel(page, "素材", mapped.materialLabel);
-        if (!materialSelected) {
-          console.warn("[iichi-draft] 素材を選択できません", mapped.materialLabel);
+        if (mapped.materialLabel) {
+          const materialSelected = await selectDropdownByLabel(page, "素材", mapped.materialLabel);
+          if (!materialSelected) {
+            console.warn("[iichi-draft] 素材を選択できません", mapped.materialLabel);
+          }
         }
-      }
 
-      const tempFiles = await downloadImages(mapped.imageUrls);
-      let filesToUpload = tempFiles;
-      const fallbackImage = path.resolve(process.cwd(), "public/vercel.svg");
-      if (!filesToUpload.length && fs.existsSync(fallbackImage)) {
-        filesToUpload = [fallbackImage];
-      }
-      try {
-        if (filesToUpload.length) {
-          const fileInput = page.locator(selectors.imageFileInput).first();
-          await expect(fileInput).toBeAttached();
-          await fileInput.setInputFiles(filesToUpload);
-        } else {
-          testInfo.annotations.push({
-            type: "WARN",
-            description: "画像URLがないため、手動で画像をアップロードしてください。",
-          });
+        const tempFiles = await downloadImages(mapped.imageUrls);
+        let filesToUpload = tempFiles;
+        const fallbackImage = path.resolve(process.cwd(), "public/vercel.svg");
+        if (!filesToUpload.length && fs.existsSync(fallbackImage)) {
+          filesToUpload = [fallbackImage];
         }
-      } finally {
-        await cleanupTempFiles(tempFiles);
-      }
-
-      if (mapped.shippingMethodLabel) {
-        const shippingSelected = await selectDropdownByLabel(page, "配送方法", mapped.shippingMethodLabel);
-        if (!shippingSelected) {
-          console.warn("[iichi-draft] 配送方法を選択できません", mapped.shippingMethodLabel);
+        try {
+          if (filesToUpload.length) {
+            const fileInput = page.locator(selectors.imageFileInput).first();
+            await expect(fileInput).toBeAttached();
+            await fileInput.setInputFiles(filesToUpload);
+          } else {
+            testInfo.annotations.push({
+              type: "WARN",
+              description: "画像URLがないため、手動で画像をアップロードしてください。",
+            });
+          }
+        } finally {
+          await cleanupTempFiles(tempFiles);
         }
-      }
-    });
 
-    await test.step("保存", async () => {
-      const saveButton = page.getByRole("button", { name: /保存/ }).first();
-      await expect(saveButton).toBeVisible();
-      await saveButton.click();
-      await expect(page.locator(".AfterPostPopup__title--jnwVU")).toHaveText(/保存されました/, {
-        timeout: 15_000,
+        if (mapped.shippingMethodLabel) {
+          const shippingSelected = await selectDropdownByLabel(
+            page,
+            "配送方法",
+            mapped.shippingMethodLabel
+          );
+          if (!shippingSelected) {
+            console.warn("[iichi-draft] 配送方法を選択できません", mapped.shippingMethodLabel);
+          }
+        }
+
+        const saveButton = page.getByRole("button", { name: /保存/ }).first();
+        await expect(saveButton).toBeVisible();
+        await saveButton.click();
+        await expect(page.locator(".AfterPostPopup__title--jnwVU")).toHaveText(/保存されました/, {
+          timeout: 15_000,
+        });
+        testInfo.annotations.push({
+          type: "NEXT",
+          description: "保存完了後のレビューや公開設定は画面上でご確認ください。",
+        });
       });
-      testInfo.annotations.push({
-        type: "NEXT",
-        description: "保存完了後のレビューや公開設定は画面上でご確認ください。",
-      });
-    });
+    }
   });
 });
 
@@ -171,18 +173,16 @@ type IichiDraftMapped = {
   imageUrls: string[];
 };
 
-async function pickProductForIichi(): Promise<SpreadsheetProductRecord | null> {
+async function listProductsForIichi(): Promise<SpreadsheetProductRecord[]> {
   const products = await googleSheetsProductRepository.listProducts();
   console.log("[iichi-draft] fetched products", products.length);
   for (const p of products) {
     console.log("[iichi-draft] candidate", p.id, p.platforms, p.syncStatus);
   }
-  return (
-    products.find(
-      (product) =>
-        product.platforms.some((platform) => platform.toLowerCase() === "iichi") &&
-        product.syncStatus === "ready"
-    ) ?? null
+  return products.filter(
+    (product) =>
+      product.platforms.some((platform) => platform.toLowerCase() === "iichi") &&
+      product.syncStatus === "ready"
   );
 }
 

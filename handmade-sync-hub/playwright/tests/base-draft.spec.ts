@@ -30,15 +30,9 @@ test.describe("BASE 自動化フロー", () => {
       "PLAYWRIGHT_BASE_EMAIL / PLAYWRIGHT_BASE_PASSWORD を設定してください。"
     );
 
-    const product = await pickProductForBase();
-    console.log(
-      "[base-draft] product found?",
-      Boolean(product),
-      product?.id
-    );
-    test.skip(!product, "BASE 対象のシート商品が見つかりませんでした。");
-
-    const mappedProduct = mapProductToBaseDraft(product!);
+    const readyProducts = await listProductsForBase();
+    console.log("[base-draft] ready products", readyProducts.map((p) => p.id));
+    test.skip(!readyProducts.length, "BASE 対象のシート商品が見つかりませんでした。");
 
     testInfo.annotations.push({
       type: "TODO",
@@ -72,7 +66,7 @@ test.describe("BASE 自動化フロー", () => {
       await page.pause();
     });
 
-    await test.step("商品一覧ページを開く", async () => {
+    const openItemsPage = async () => {
       const openItemsPage = async () => {
         await page.goto(`${baseOrigin}${BASE_ITEMS_PATH}`, {
           waitUntil: "domcontentloaded",
@@ -94,98 +88,93 @@ test.describe("BASE 自動化フロー", () => {
         await page.pause();
         await openItemsPage();
       }
-    });
+    for (const product of readyProducts) {
+      const mappedProduct = mapProductToBaseDraft(product);
 
-    await test.step("商品登録ボタンを押下", async () => {
-      await page.getByRole("button", { name: /商品を登録する/i }).click();
-      await page.waitForURL(new RegExp(`${BASE_ADD_ITEM_PATH.replace(/\//g, "\\/")}`), {
-        waitUntil: "domcontentloaded",
-      });
-      await expect(page).toHaveURL(new RegExp(`${BASE_ADD_ITEM_PATH.replace(/\//g, "\\/")}`));
-      await expect(page.locator("body")).toContainText(/商品登録/i);
-    });
-
-    await test.step("公開設定を下書きに変更", async () => {
-      const publishInput = page.locator(
-        'xpath=//p[contains(normalize-space(),"公開する")]/ancestor::*[self::label or contains(@class,"c-checkbox")][1]//input[@type="checkbox"] | //input[@type="checkbox"][contains(@name,"publish")] | //input[@type="checkbox"][contains(@id,"publish")]'
-      );
-
-      const publishToggleArea = page.locator(
-        'xpath=//p[contains(normalize-space(),"公開する")]/ancestor::*[self::label or contains(@class,"c-checkbox")]'
-      );
-
-      try {
-        await publishInput.first().waitFor({ state: "attached", timeout: 5000 });
-        const inputHandle = publishInput.first();
-        if (await inputHandle.isChecked()) {
-          try {
-            await inputHandle.setChecked(false, { force: true });
-          } catch {
-            // fallback to clicking surrounding area
-          }
-        }
-
-        if (await inputHandle.isChecked()) {
-          await publishToggleArea.first().click({ force: true });
-        }
-
-        if (await inputHandle.isChecked()) {
-          await page.evaluate(() => {
-            const label = document.querySelector(
-              'p.c-checkbox__text'
-            );
-            if (label) {
-              const checkbox = label.closest(".c-checkbox")?.querySelector("input[type='checkbox']");
-              if (checkbox) {
-                checkbox.checked = false;
-                checkbox.dispatchEvent(new Event("change", { bubbles: true }));
-              }
-            }
-          });
-        }
-      } catch (error) {
-        testInfo.annotations.push({
-          type: "WARN",
-          description: "公開設定のチェックボックスを操作できませんでした。手動で外してください。",
+      await test.step(`商品 ${product.id} を登録`, async () => {
+        await openItemsPage();
+        await page.getByRole("button", { name: /商品を登録する/i }).click();
+        await page.waitForURL(new RegExp(`${BASE_ADD_ITEM_PATH.replace(/\//g, "\\/")}`), {
+          waitUntil: "domcontentloaded",
         });
-      }
-    });
+        await expect(page).toHaveURL(new RegExp(`${BASE_ADD_ITEM_PATH.replace(/\//g, "\\/")}`));
+        await expect(page.locator("body")).toContainText(/商品登録/i);
 
-    await test.step("商品情報を入力", async () => {
-      const tempImageFiles = await downloadImages(mappedProduct.imageUrls);
-      let imageFiles = tempImageFiles;
-      if (!imageFiles.length && fs.existsSync(LOCAL_SAMPLE_IMAGE)) {
-        imageFiles = [LOCAL_SAMPLE_IMAGE];
-      }
+        const publishInput = page.locator(
+          'xpath=//p[contains(normalize-space(),"公開する")]/ancestor::*[self::label or contains(@class,"c-checkbox")][1]//input[@type="checkbox"] | //input[@type="checkbox"][contains(@name,"publish")] | //input[@type="checkbox"][contains(@id,"publish")]'
+        );
 
-      await page.locator("#itemDetail_name").fill(mappedProduct.title);
-      await page.locator("#itemDetail_detail").fill(mappedProduct.description);
-      await page.locator("#itemDetail_price").fill(mappedProduct.price);
-      await page.locator("#itemDetail_stock").fill(mappedProduct.stock);
+        const publishToggleArea = page.locator(
+          'xpath=//p[contains(normalize-space(),"公開する")]/ancestor::*[self::label or contains(@class,"c-checkbox")]'
+        );
 
-      try {
-        if (imageFiles.length) {
-          await page.setInputFiles("input.m-uploadBox__input[type='file']", imageFiles);
-        } else {
+        try {
+          await publishInput.first().waitFor({ state: "attached", timeout: 5000 });
+          const inputHandle = publishInput.first();
+          if (await inputHandle.isChecked()) {
+            try {
+              await inputHandle.setChecked(false, { force: true });
+            } catch {}
+          }
+
+          if (await inputHandle.isChecked()) {
+            await publishToggleArea.first().click({ force: true });
+          }
+
+          if (await inputHandle.isChecked()) {
+            await page.evaluate(() => {
+              const label = document.querySelector('p.c-checkbox__text');
+              if (label) {
+                const checkbox = label
+                  .closest(".c-checkbox")
+                  ?.querySelector("input[type='checkbox']");
+                if (checkbox) {
+                  checkbox.checked = false;
+                  checkbox.dispatchEvent(new Event("change", { bubbles: true }));
+                }
+              }
+            });
+          }
+        } catch (error) {
           testInfo.annotations.push({
             type: "WARN",
-            description: "画像URLが見つからないため、手動で画像をアップロードしてください。",
+            description: "公開設定のチェックボックスを操作できませんでした。手動で外してください。",
           });
         }
-      } finally {
-        await cleanupTempFiles(tempImageFiles);
-      }
-    });
 
-    await test.step("商品を登録ボタンで送信", async () => {
-      await Promise.all([
-        page.waitForLoadState("networkidle"),
-        page
-          .getByRole("button", { name: /商品を登録/i })
-          .first()
-          .click(),
-      ]);
-    });
+        const tempImageFiles = await downloadImages(mappedProduct.imageUrls);
+        let imageFiles = tempImageFiles;
+        if (!imageFiles.length && fs.existsSync(LOCAL_SAMPLE_IMAGE)) {
+          imageFiles = [LOCAL_SAMPLE_IMAGE];
+        }
+
+        await page.locator("#itemDetail_name").fill(mappedProduct.title);
+        await page.locator("#itemDetail_detail").fill(mappedProduct.description);
+        await page.locator("#itemDetail_price").fill(mappedProduct.price);
+        await page.locator("#itemDetail_stock").fill(mappedProduct.stock);
+
+        try {
+          if (imageFiles.length) {
+            await page.setInputFiles("input.m-uploadBox__input[type='file']", imageFiles);
+          } else {
+            testInfo.annotations.push({
+              type: "WARN",
+              description: "画像URLが見つからないため、手動で画像をアップロードしてください。",
+            });
+          }
+        } finally {
+          await cleanupTempFiles(tempImageFiles);
+        }
+
+        await Promise.all([
+          page.waitForLoadState("networkidle"),
+          page
+            .getByRole("button", { name: /商品を登録/i })
+            .first()
+            .click(),
+        ]);
+      });
+    }
   });
 });
 
@@ -197,18 +186,18 @@ type BaseDraftMapped = {
   imageUrls: string[];
 };
 
-async function pickProductForBase(): Promise<SpreadsheetProductRecord | null> {
+async function listProductsForBase(): Promise<SpreadsheetProductRecord[]> {
   const products = await googleSheetsProductRepository.listProducts();
   console.log("[base-draft] fetched products", products.length);
   for (const p of products) {
     console.log("[base-draft] candidate", p.id, p.platforms, p.syncStatus);
   }
   return (
-    products.find(
+    products.filter(
       (product) =>
         product.platforms.some((platform) => platform.toLowerCase() === "base") &&
         product.syncStatus === "ready"
-    ) ?? null
+    ) ?? []
   );
 }
 
