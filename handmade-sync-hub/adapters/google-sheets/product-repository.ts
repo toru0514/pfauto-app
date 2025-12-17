@@ -102,7 +102,7 @@ const HEADER_ALIASES = {
   note: ["notes_internal", "メモ", "note"],
 };
 
-const PLATFORM_PREFIXES = ["creema", "minne", "base"];
+const PLATFORM_PREFIXES = ["creema", "minne", "base", "iichi"];
 
 type SheetMatrix = {
   headerRow: string[];
@@ -229,6 +229,7 @@ function normalizePlatformName(value: string): string {
   if (lower.includes("creema")) return "creema";
   if (lower.includes("minne")) return "minne";
   if (lower.includes("base")) return "base";
+  if (lower.includes("iichi")) return "iichi";
   return lower;
 }
 

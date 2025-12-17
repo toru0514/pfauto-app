@@ -73,6 +73,15 @@ npm run start
   PLAYWRIGHT_RUN_MINNE=true npx playwright test playwright/tests/minne-draft.spec.ts --debug
   ```
 
+#### iichi
+- Ensure `.env.local` has `PLAYWRIGHT_IICHI_EMAIL`, `PLAYWRIGHT_IICHI_PASSWORD`, and `PLAYWRIGHT_RUN_IICHI=true`.
+- Flow: script opens https://www.iichi.com/ → clicks ログイン → fillsメール・パスワード→`/account`→`/your/item/create`でフォーム入力→保存ボタン押下。カテゴリや素材・配送方法はシートの `iichi_*` 列（ラベル文字列）と一致する選択肢をクリックします。
+- Rows with `出品先` containing `iichi` and `ステータス=ready` are targeted. 画像URLが無い場合は `public/vercel.svg` をフォールバックとして使用します。
+- Debug run:
+  ```bash
+  PLAYWRIGHT_RUN_IICHI=true npx playwright test playwright/tests/iichi-draft.spec.ts --debug
+  ```
+
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
