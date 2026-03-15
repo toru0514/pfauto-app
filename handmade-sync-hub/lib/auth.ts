@@ -1,5 +1,6 @@
 import type { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
+import bcrypt from "bcryptjs";
 
 type AdminUser = {
   id: string;
@@ -22,15 +23,26 @@ export const authOptions: NextAuthOptions = {
         }
 
         const adminEmail = process.env.ADMIN_EMAIL;
-        const adminPassword = process.env.ADMIN_PASSWORD;
+        const adminPasswordHash = process.env.ADMIN_PASSWORD_HASH;
 
-        if (
-          credentials.email === adminEmail &&
-          credentials.password === adminPassword
-        ) {
+        if (!adminEmail || !adminPasswordHash) {
+          console.error("[auth] ADMIN_EMAIL or ADMIN_PASSWORD_HASH is not set");
+          return null;
+        }
+
+        if (credentials.email !== adminEmail) {
+          return null;
+        }
+
+        const isValidPassword = await bcrypt.compare(
+          credentials.password,
+          adminPasswordHash
+        );
+
+        if (isValidPassword) {
           const adminUser: AdminUser = {
             id: "admin",
-            email: adminEmail ?? "",
+            email: adminEmail,
             name: "Admin",
             role: "admin",
           };
@@ -43,6 +55,8 @@ export const authOptions: NextAuthOptions = {
   ],
   session: {
     strategy: "jwt",
+    maxAge: 24 * 60 * 60, // 24 hours
+    updateAge: 60 * 60, // 1 hour - refresh token every hour
   },
   callbacks: {
     async jwt({ token, user }) {

@@ -8,6 +8,11 @@ import type {
   SpreadsheetProductRecord,
 } from "@/application/types/product";
 import type { JobStatus, ProductStatus } from "@/application/types/status";
+import { getLogger } from "@/lib/logger";
+import { getGoogleSheetsRateLimiter } from "@/lib/rate-limiter";
+
+const log = getLogger("google-sheets-repository");
+const rateLimiter = getGoogleSheetsRateLimiter();
 
 const DEFAULT_SHEET_TITLE = "シート1";
 const VALUE_RANGE = "A1:ZZ"; // covers columns A-ZZ (~702 columns)
@@ -369,129 +374,144 @@ export class GoogleSheetsProductRepository implements ProductRepositoryPort {
 
   async updateProductStatuses(input: UpdateProductStatusInput): Promise<void> {
     if (shouldUseMockSheetData()) {
-      console.warn(
-        "[googleSheetsProductRepository] USE_MOCK_SHEETS_DATA=true のため updateProductStatuses をスキップしました。"
-      );
+      log.warn("USE_MOCK_SHEETS_DATA=true のため updateProductStatuses をスキップしました", {
+        productId: input.productId,
+      });
       return;
     }
 
-    const matrix = await this.fetchSheetMatrix();
-    if (!matrix) return;
-    const { headerRow, rows } = matrix;
+    try {
+      const matrix = await this.fetchSheetMatrix();
+      if (!matrix) return;
+      const { headerRow, rows } = matrix;
 
-    const productIdIndex = findColumnIndex(headerRow, HEADER_ALIASES.productId);
-    if (productIdIndex === null) {
-      throw new Error("product_id 列が見つかりませんでした。");
-    }
-
-    let targetRowNumber: number | null = null;
-    rows.forEach((row, rowIndex) => {
-      const rowProductId = row[productIdIndex];
-      if (rowProductId && rowProductId === input.productId) {
-        targetRowNumber = rowIndex + 2; // header row offset
+      const productIdIndex = findColumnIndex(headerRow, HEADER_ALIASES.productId);
+      if (productIdIndex === null) {
+        throw new Error("product_id 列が見つかりませんでした。");
       }
-    });
 
-    if (!targetRowNumber) {
-      throw new Error(`product_id=${input.productId} の行が見つかりませんでした。`);
-    }
+      let targetRowNumber: number | null = null;
+      rows.forEach((row, rowIndex) => {
+        const rowProductId = row[productIdIndex];
+        if (rowProductId && rowProductId === input.productId) {
+          targetRowNumber = rowIndex + 2; // header row offset
+        }
+      });
 
-    const updates: sheets_v4.Schema$ValueRange[] = [];
-    const sheetTitle = getSheetTitle();
-
-    if (input.syncStatus) {
-      const index = findColumnIndex(headerRow, HEADER_ALIASES.syncStatus);
-      if (index !== null) {
-        updates.push({
-          range: `${sheetTitle}!${columnIndexToLetter(index)}${targetRowNumber}`,
-          values: [[input.syncStatus]],
-        });
+      if (!targetRowNumber) {
+        throw new Error(`product_id=${input.productId} の行が見つかりませんでした。`);
       }
-    }
 
-    if (input.platformStatuses) {
-      for (const [platform, status] of Object.entries(input.platformStatuses)) {
-        if (!status) continue;
-        const alias = [`${platform}_status`, `${platform}status`];
-        const index = findColumnIndex(headerRow, alias);
+      const updates: sheets_v4.Schema$ValueRange[] = [];
+      const sheetTitle = getSheetTitle();
+
+      if (input.syncStatus) {
+        const index = findColumnIndex(headerRow, HEADER_ALIASES.syncStatus);
         if (index !== null) {
           updates.push({
             range: `${sheetTitle}!${columnIndexToLetter(index)}${targetRowNumber}`,
-            values: [[status]],
+            values: [[input.syncStatus]],
           });
         }
       }
-    }
 
-    if (input.lastSyncedTimestamps) {
-      for (const [platform, timestamp] of Object.entries(
-        input.lastSyncedTimestamps
-      )) {
-        const alias = [
-          `${platform}_last_synced_at`,
-          `${platform}lastsyncedat`,
-          `last_synced_at_${platform}`,
-        ];
-        const index = findColumnIndex(headerRow, alias);
-        if (index !== null) {
-          updates.push({
-            range: `${sheetTitle}!${columnIndexToLetter(index)}${targetRowNumber}`,
-            values: [[timestamp ?? ""]],
-          });
+      if (input.platformStatuses) {
+        for (const [platform, status] of Object.entries(input.platformStatuses)) {
+          if (!status) continue;
+          const alias = [`${platform}_status`, `${platform}status`];
+          const index = findColumnIndex(headerRow, alias);
+          if (index !== null) {
+            updates.push({
+              range: `${sheetTitle}!${columnIndexToLetter(index)}${targetRowNumber}`,
+              values: [[status]],
+            });
+          }
         }
       }
-    }
 
-    if (input.clearErrorsForPlatforms?.length) {
-      // 共通エラー列を空にする
-      const commonErrorIndex = findColumnIndex(
-        headerRow,
-        HEADER_ALIASES.lastError
-      );
-      if (commonErrorIndex !== null) {
-        updates.push({
-          range: `${sheetTitle}!${columnIndexToLetter(commonErrorIndex)}${targetRowNumber}`,
-          values: [[""]],
-        });
+      if (input.lastSyncedTimestamps) {
+        for (const [platform, timestamp] of Object.entries(
+          input.lastSyncedTimestamps
+        )) {
+          const alias = [
+            `${platform}_last_synced_at`,
+            `${platform}lastsyncedat`,
+            `last_synced_at_${platform}`,
+          ];
+          const index = findColumnIndex(headerRow, alias);
+          if (index !== null) {
+            updates.push({
+              range: `${sheetTitle}!${columnIndexToLetter(index)}${targetRowNumber}`,
+              values: [[timestamp ?? ""]],
+            });
+          }
+        }
       }
 
-      for (const platform of input.clearErrorsForPlatforms) {
-        const aliases = [
-          `${platform}_last_error`,
-          `${platform}_last_error_message`,
-          `last_error_message_${platform}`,
-          `${platform}lasterror`,
-        ];
-        const index = findColumnIndex(headerRow, aliases);
-        if (index !== null) {
+      if (input.clearErrorsForPlatforms?.length) {
+        // 共通エラー列を空にする
+        const commonErrorIndex = findColumnIndex(
+          headerRow,
+          HEADER_ALIASES.lastError
+        );
+        if (commonErrorIndex !== null) {
           updates.push({
-            range: `${sheetTitle}!${columnIndexToLetter(index)}${targetRowNumber}`,
+            range: `${sheetTitle}!${columnIndexToLetter(commonErrorIndex)}${targetRowNumber}`,
             values: [[""]],
           });
         }
+
+        for (const platform of input.clearErrorsForPlatforms) {
+          const aliases = [
+            `${platform}_last_error`,
+            `${platform}_last_error_message`,
+            `last_error_message_${platform}`,
+            `${platform}lasterror`,
+          ];
+          const index = findColumnIndex(headerRow, aliases);
+          if (index !== null) {
+            updates.push({
+              range: `${sheetTitle}!${columnIndexToLetter(index)}${targetRowNumber}`,
+              values: [[""]],
+            });
+          }
+        }
       }
-    }
 
-    if ("note" in input) {
-      const noteIndex = findColumnIndex(headerRow, HEADER_ALIASES.note);
-      if (noteIndex !== null) {
-        updates.push({
-          range: `${sheetTitle}!${columnIndexToLetter(noteIndex)}${targetRowNumber}`,
-          values: [[input.note ?? ""]],
-        });
+      if ("note" in input) {
+        const noteIndex = findColumnIndex(headerRow, HEADER_ALIASES.note);
+        if (noteIndex !== null) {
+          updates.push({
+            range: `${sheetTitle}!${columnIndexToLetter(noteIndex)}${targetRowNumber}`,
+            values: [[input.note ?? ""]],
+          });
+        }
       }
+
+      if (!updates.length) return;
+
+      // Apply rate limiting before API call
+      await rateLimiter.acquire();
+
+      const sheets = getSheetsClient();
+      await sheets.spreadsheets.values.batchUpdate({
+        spreadsheetId: getSpreadsheetId(),
+        requestBody: {
+          valueInputOption: "RAW",
+          data: updates,
+        },
+      });
+
+      log.info("スプレッドシート更新完了", {
+        productId: input.productId,
+        updatedFields: updates.length,
+      });
+    } catch (error) {
+      log.error("スプレッドシート更新失敗", error, {
+        productId: input.productId,
+      });
+      throw error;
     }
-
-    if (!updates.length) return;
-
-    const sheets = getSheetsClient();
-    await sheets.spreadsheets.values.batchUpdate({
-      spreadsheetId: getSpreadsheetId(),
-      requestBody: {
-        valueInputOption: "RAW",
-        data: updates,
-      },
-    });
   }
 
   private async fetchSheetMatrix(): Promise<SheetMatrix | null> {
@@ -499,27 +519,42 @@ export class GoogleSheetsProductRepository implements ProductRepositoryPort {
       return getMockSheetMatrix();
     }
 
-    const sheets = getSheetsClient();
-    const spreadsheetId = getSpreadsheetId();
-    const sheetTitle = getSheetTitle();
-    const range = `${sheetTitle}!${VALUE_RANGE}`;
+    try {
+      // Apply rate limiting before API call
+      await rateLimiter.acquire();
 
-    const { data } = await sheets.spreadsheets.values.get({
-      spreadsheetId,
-      range,
-      majorDimension: "ROWS",
-    });
+      const sheets = getSheetsClient();
+      const spreadsheetId = getSpreadsheetId();
+      const sheetTitle = getSheetTitle();
+      const range = `${sheetTitle}!${VALUE_RANGE}`;
 
-    const values = data.values ?? [];
-    if (!values.length) {
-      return {
-        headerRow: [],
-        rows: [],
-      };
+      const { data } = await sheets.spreadsheets.values.get({
+        spreadsheetId,
+        range,
+        majorDimension: "ROWS",
+      });
+
+      const values = data.values ?? [];
+      if (!values.length) {
+        log.info("スプレッドシートにデータがありません", { spreadsheetId, range });
+        return {
+          headerRow: [],
+          rows: [],
+        };
+      }
+
+      const [headerRow, ...rows] = values;
+      log.debug("スプレッドシート読み込み完了", {
+        headerCount: headerRow.length,
+        rowCount: rows.length,
+      });
+      return { headerRow, rows };
+    } catch (error) {
+      log.error("スプレッドシート読み込み失敗", error, {
+        spreadsheetId: process.env.GOOGLE_SHEETS_SPREADSHEET_ID,
+      });
+      throw error;
     }
-
-    const [headerRow, ...rows] = values;
-    return { headerRow, rows };
   }
 }
 
