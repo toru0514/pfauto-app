@@ -29,9 +29,6 @@ export async function enqueueDraft(productId: string, platforms: string[]) {
 }
 
 export async function getSpreadsheetUrl(): Promise<string | null> {
-  const useMockData = process.env.USE_MOCK_SHEETS_DATA === "true";
-  if (useMockData) return null;
-
   const spreadsheetId = process.env.GOOGLE_SHEETS_SPREADSHEET_ID;
   if (!spreadsheetId) return null;
 
