@@ -9,9 +9,6 @@ on:
 jobs:
   lint-build-test:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: handmade-sync-hub
 
     steps:
       - name: Checkout code
@@ -70,9 +67,6 @@ jobs:
 
   typecheck:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: handmade-sync-hub
 
     steps:
       - name: Checkout code
