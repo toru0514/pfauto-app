@@ -1,35 +1,10 @@
 import { expect, test } from "@playwright/test";
-import fs from "node:fs";
-import { promises as fsPromises } from "node:fs";
-import os from "node:os";
-import path from "node:path";
-import { randomUUID } from "node:crypto";
 import { googleSheetsProductRepository } from "@/adapters/google-sheets/product-repository";
 import type { SpreadsheetProductRecord } from "@/application/types/product";
+import { MinnePage } from "./page-objects/minne-page";
+import { pickFirstNonEmpty, parseInteger, parseImageUrls, normalizeId, cleanupTempFiles } from "./shared/utils";
 
 const RUN_MINNE_FLOW = process.env.PLAYWRIGHT_RUN_MINNE === "true";
-const MINNE_LOGIN_URL = "https://minne.com/signin";
-const MINNE_HOME_URL = "https://minne.com/account";
-const MINNE_NEW_PRODUCT_URL = "https://minne.com/account/products/new";
-
-const selectors = {
-  loginEmail: "#email",
-  loginSubmit: "input.c-magic-link-sending-button",
-  titleInput: "#name",
-  categoryParentSelect: "#category",
-  categoryChildSelect: "select[aria-label*='小カテゴリー']",
-  descriptionTextarea: "#description",
-  priceInput: "#price",
-  stockInput: "#stock-unit",
-  shippingDaysInput: "#shipping-days",
-  imageFileInput: "input[type='file']",
-  shippingMethodSelect: "#shipping-method-shipped-by-0",
-  shippingAreaInput: "#shipping-method-shipped-to-0",
-  shippingFeeInput: "#shipping-method-cost-0",
-  shippingAdditionalFeeInput: "#shipping-method-additional-cost-0",
-  submitButton: "button.gtm-products-new-submit-click-tracking-web-front",
-  flashSuccess: "p.AccountPhysicalProductPage_flash-message-success__CI_ug",
-};
 
 test.describe("minne 自動化フロー", () => {
   test.skip(!RUN_MINNE_FLOW, "PLAYWRIGHT_RUN_MINNE=true を指定したときのみ実行します。");
@@ -45,98 +20,52 @@ test.describe("minne 自動化フロー", () => {
     );
     test.skip(!products.length, "minne 対象のシート商品が見つかりませんでした。");
 
+    const minnePage = new MinnePage(page);
+
     await test.step("ログインリンクを送信", async () => {
-      await page.goto(MINNE_LOGIN_URL, { waitUntil: "domcontentloaded" });
-      await page.fill(selectors.loginEmail, minneEmail!);
-      await page.click(selectors.loginSubmit);
+      await minnePage.sendLoginLink(minneEmail!);
       testInfo.annotations.push({
         type: "INFO",
         description:
           "メールに届く minne のログインリンクを開いてください。開いた後、Playwright Inspector で Resume を押すと次に進みます。",
       });
-      await page.pause();
     });
 
     await test.step("マイページを開く", async () => {
-      await page.goto(MINNE_HOME_URL, { waitUntil: "domcontentloaded" });
-      await expect(page).toHaveURL(/\/account/);
+      await minnePage.navigateToHome();
     });
 
     for (const product of products) {
       const mapped = mapProductToMinneDraft(product);
       await test.step(`作品 ${product.id} の入力`, async () => {
-        await page.goto(MINNE_NEW_PRODUCT_URL, { waitUntil: "domcontentloaded" });
-        await expect(page).toHaveURL(/\/account\/products\/new/);
-        await page.fill(selectors.titleInput, mapped.title);
+        await minnePage.navigateToNewProduct();
+        await minnePage.fillTitle(mapped.title);
+        await minnePage.selectCategory(mapped.categoryParentId, mapped.categoryId);
+        await minnePage.fillDescription(mapped.description);
+        await minnePage.fillPrice(mapped.price);
+        await minnePage.fillStock(mapped.stock);
+        await minnePage.fillShippingDays(mapped.shippingDays);
 
-      if (mapped.categoryParentId) {
-        await page.selectOption(selectors.categoryParentSelect, mapped.categoryParentId).catch(() => {
-          console.warn("[minne-draft] 親カテゴリが選択できません", mapped.categoryParentId);
-        });
-      }
+        const imageFiles = await minnePage.uploadImages(mapped.imageUrls);
+        try {
+          if (!imageFiles.length && !mapped.imageUrls.length) {
+            testInfo.annotations.push({
+              type: "WARN",
+              description: "画像URLがないため、手動で画像をアップロードしてください。",
+            });
+          }
 
-      if (mapped.categoryId) {
-        const childSelect = page.locator(selectors.categoryChildSelect).first();
-        await childSelect.waitFor({ state: "attached", timeout: 10_000 }).catch(() => {});
-        if (await childSelect.isEnabled()) {
-          await childSelect.selectOption(mapped.categoryId).catch(() => {
-            console.warn("[minne-draft] 子カテゴリが選択できません", mapped.categoryId);
-          });
+          await minnePage.fillShipping(
+            mapped.shippingMethod,
+            mapped.shippingArea,
+            mapped.shippingFee,
+            mapped.shippingAdditionalFee
+          );
+
+          await minnePage.submitForm();
+        } finally {
+          await cleanupTempFiles(imageFiles, "minne");
         }
-      }
-
-      await page.fill(selectors.descriptionTextarea, mapped.description);
-      await page.fill(selectors.priceInput, mapped.price);
-      await page.fill(selectors.stockInput, mapped.stock);
-      await page.fill(selectors.shippingDaysInput, mapped.shippingDays);
-
-      const imageFiles = await downloadImages(mapped.imageUrls);
-      let filesToUpload = imageFiles;
-      if (!filesToUpload.length && fs.existsSync(path.resolve(process.cwd(), "public/vercel.svg"))) {
-        filesToUpload = [path.resolve(process.cwd(), "public/vercel.svg")];
-      }
-      try {
-        if (filesToUpload.length) {
-          const fileInput = page.locator(selectors.imageFileInput).first();
-          await fileInput.evaluate((node) => {
-            if (node instanceof HTMLElement) {
-              node.removeAttribute("hidden");
-              node.style.display = "block";
-            }
-          }).catch(() => {});
-          await fileInput.setInputFiles(filesToUpload);
-        } else {
-          testInfo.annotations.push({
-            type: "WARN",
-            description: "画像URLがないため、手動で画像をアップロードしてください。",
-          });
-        }
-      } finally {
-        await cleanupTempFiles(imageFiles);
-      }
-
-      if (mapped.shippingMethod) {
-        await page.selectOption(selectors.shippingMethodSelect, mapped.shippingMethod).catch(() => {
-          console.warn("[minne-draft] 配送方法を選択できません", mapped.shippingMethod);
-        });
-      }
-      if (mapped.shippingArea) {
-        await page.fill(selectors.shippingAreaInput, mapped.shippingArea);
-      }
-      if (mapped.shippingFee) {
-        await page.fill(selectors.shippingFeeInput, mapped.shippingFee);
-      }
-        if (mapped.shippingAdditionalFee) {
-          await page.fill(selectors.shippingAdditionalFeeInput, mapped.shippingAdditionalFee);
-        }
-
-        const submitButton = page.locator(selectors.submitButton).first();
-        await expect(submitButton).toBeVisible();
-        await submitButton.scrollIntoViewIfNeeded();
-        await submitButton.click();
-        await expect(page.locator(selectors.flashSuccess)).toContainText("作品", {
-          timeout: 15_000,
-        });
       });
     }
   });
@@ -241,75 +170,4 @@ function mapProductToMinneDraft(product: SpreadsheetProductRecord): MinneDraftMa
       )
     ),
   };
-}
-
-function normalizeId(value: string | null | undefined): string | null {
-  if (!value) return null;
-  const trimmed = value.trim();
-  return trimmed.length ? trimmed : null;
-}
-
-function pickFirstNonEmpty(...values: Array<string | null | undefined>): string | null {
-  for (const value of values) {
-    if (value && value.trim()) {
-      return value.trim();
-    }
-  }
-  return null;
-}
-
-function parseInteger(value: string | null | undefined): number | null {
-  if (!value) return null;
-  const sanitized = value.replace(/[^0-9.+-]/g, "");
-  if (!sanitized) return null;
-  const parsed = Number(sanitized);
-  return Number.isFinite(parsed) ? parsed : null;
-}
-
-function parseImageUrls(value: string | null | undefined): string[] {
-  if (!value) return [];
-  return value
-    .split(/[\n,]+/)
-    .map((entry) => entry.trim())
-    .filter(Boolean);
-}
-
-async function downloadImages(urls: string[]): Promise<string[]> {
-  const results: string[] = [];
-  for (const url of urls) {
-    try {
-      const response = await fetch(url);
-      if (!response.ok) {
-        console.warn("[minne-draft] image download failed", url, response.status);
-        continue;
-      }
-      const arrayBuffer = await response.arrayBuffer();
-      const ext = (() => {
-        try {
-          const pathname = new URL(url).pathname;
-          const candidate = path.extname(pathname);
-          return candidate || ".jpg";
-        } catch {
-          return ".jpg";
-        }
-      })();
-      const tempPath = path.join(os.tmpdir(), `minne-image-${randomUUID()}${ext}`);
-      await fsPromises.writeFile(tempPath, Buffer.from(arrayBuffer));
-      console.log("[minne-draft] image saved", url, tempPath, arrayBuffer.byteLength);
-      results.push(tempPath);
-    } catch (error) {
-      console.warn("[minne-draft] image download failed", url, error);
-    }
-  }
-  return results;
-}
-
-async function cleanupTempFiles(files: string[]): Promise<void> {
-  await Promise.all(
-    files.map((file) =>
-      fsPromises.unlink(file).catch((error) => {
-        console.warn("[minne-draft] temp image cleanup failed", file, error);
-      })
-    )
-  );
 }
