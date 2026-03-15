@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useState, useTransition } from "react";
+import { ExternalLink } from "lucide-react";
 import {
   enqueueDraft,
   refreshProductsFromSheets,
@@ -12,6 +13,7 @@ import { useToast } from "@/components/providers/toast-provider";
 type Props = {
   products: ProductRow[];
   jobs: JobRow[];
+  spreadsheetUrl: string | null;
 };
 
 type DetailProduct = ProductRow & {
@@ -27,7 +29,7 @@ type OperationLogEntry = {
   createdAt: number;
 };
 
-export function DashboardContent({ products, jobs }: Props) {
+export function DashboardContent({ products, jobs, spreadsheetUrl }: Props) {
   const [pendingRefresh, startRefresh] = useTransition();
   const [pendingEnqueue, startEnqueue] = useTransition();
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
@@ -102,14 +104,27 @@ export function DashboardContent({ products, jobs }: Props) {
             スプレッドシートの同期状態と自動化ジョブの状況を確認できます。
           </p>
         </div>
-        <button
-          type="button"
-          onClick={handleRefresh}
-          disabled={pendingRefresh}
-          className="rounded-md bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {pendingRefresh ? "同期中..." : "最新データを同期"}
-        </button>
+        <div className="flex items-center gap-2">
+          {spreadsheetUrl && (
+            <a
+              href={spreadsheetUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-3 py-2 text-sm font-semibold text-foreground transition hover:bg-muted"
+            >
+              <ExternalLink className="h-4 w-4" />
+              スプレッドシートを開く
+            </a>
+          )}
+          <button
+            type="button"
+            onClick={handleRefresh}
+            disabled={pendingRefresh}
+            className="rounded-md bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {pendingRefresh ? "同期中..." : "最新データを同期"}
+          </button>
+        </div>
       </header>
 
       <section className="overflow-hidden rounded-lg border border-border bg-card shadow-sm">
