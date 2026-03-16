@@ -34,8 +34,8 @@ export class MinnePage {
     this.page = page;
 
     // Login
-    this.loginEmail = page.locator("#email");
-    this.loginSubmit = page.locator("input.c-magic-link-sending-button");
+    this.loginEmail = page.getByRole('textbox', { name: 'メールアドレス' });
+    this.loginSubmit = page.getByRole('button', { name: 'ログインリンクを送信' });
 
     // Form fields
     this.titleInput = page.getByRole('textbox', { name: /作品名/ });
@@ -58,7 +58,7 @@ export class MinnePage {
   }
 
   async sendLoginLink(email: string) {
-    await this.page.goto("https://minne.com/signin", {
+    await this.page.goto("https://minne.com/users/sign_in", {
       waitUntil: "domcontentloaded",
     });
     await this.loginEmail.fill(email);
