@@ -31,22 +31,26 @@ test.describe("BASE 自動化フロー", () => {
         "BASE のログインフォーム構造を確認し、セレクタや遷移先URLの検証を確定させる。",
     });
 
+    let alreadyLoggedIn = false;
+
     await test.step("ログインページへ遷移", async () => {
-      await basePage.navigateToLogin();
+      alreadyLoggedIn = await basePage.navigateToLogin();
     });
 
-    await test.step("認証情報を入力する", async () => {
-      await basePage.fillCredentials(baseEmail!, basePassword!);
-    });
-
-    await test.step("手動でログイン/追加認証を完了する", async () => {
-      testInfo.annotations.push({
-        type: "INFO",
-        description:
-          "メールアドレス/パスワード入力後、ブラウザ上でログインボタン押下と追加認証を手動で完了し、完了後に Resume を押してください。",
+    if (!alreadyLoggedIn) {
+      await test.step("認証情報を入力する", async () => {
+        await basePage.fillCredentials(baseEmail!, basePassword!);
       });
-      await basePage.waitForManualLogin();
-    });
+
+      await test.step("手動でログイン/追加認証を完了する", async () => {
+        testInfo.annotations.push({
+          type: "INFO",
+          description:
+            "メールアドレス/パスワード入力後、ブラウザ上でログインボタン押下と追加認証を手動で完了し、完了後に Resume を押してください。",
+        });
+        await basePage.waitForManualLogin();
+      });
+    }
 
     const openItemsPage = async () => {
       const tryOpen = async () => {

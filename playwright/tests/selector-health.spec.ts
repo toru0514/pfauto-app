@@ -42,7 +42,7 @@ test.describe("base selectors", () => {
     await expect(basePage.priceInput).toBeAttached({ timeout: 10_000 });
     await expect(basePage.stockInput).toBeAttached({ timeout: 10_000 });
     await expect(basePage.imageFileInput).toBeAttached({ timeout: 10_000 });
-    // publishInput はページ下部または UI 変更により未検出の可能性あり — 別途確認
+    await expect(basePage.publishInput).toBeAttached({ timeout: 10_000 });
     await expect(basePage.registerButton).toBeAttached({ timeout: 10_000 });
   });
 });
@@ -89,6 +89,8 @@ test.describe("creema selectors", () => {
     await expect(creemaPage.materialSelect).toBeAttached({ timeout: 10_000 });
     await expect(creemaPage.imageFileInput).toBeAttached({ timeout: 10_000 });
     await expect(creemaPage.categoryLevel1Select).toBeAttached({ timeout: 10_000 });
-    // nextStepButton はフォーム入力後に表示されるため健全性チェックからは除外
+
+    // nextStepButton は全必須項目入力後に条件付き表示されるため、健全性チェックからは除外
+    // 動作確認は creema-draft.spec.ts の goToShippingStep() で行う
   });
 });

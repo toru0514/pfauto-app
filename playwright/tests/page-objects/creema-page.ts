@@ -64,7 +64,8 @@ export class CreemaPage {
     this.colorCheckboxes = "input.js-item-skus-color-ids";
     this.tagHiddenInput = page.locator("#form-item-tags");
 
-    // Navigation
+    // Navigation — nextStepButton is conditionally rendered; it only appears
+    // after all required form fields are filled.
     this.nextStepButton = page.getByRole('button', { name: '入力内容の確認' });
     this.confirmButton = page.locator("input.js-item-confirm");
     this.saveDraftButton = page.getByRole('button', { name: '保存する' });
