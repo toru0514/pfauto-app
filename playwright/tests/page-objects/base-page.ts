@@ -168,6 +168,44 @@ export class BasePage {
     return tempFiles; // Caller is responsible for cleanup
   }
 
+  async selectCategory(categoryLabel: string | null): Promise<boolean> {
+    if (!categoryLabel) return false;
+    const categorySelect = this.page
+      .locator("select")
+      .filter({ has: this.page.locator(`option:has-text("${categoryLabel}")`) })
+      .first();
+    if ((await categorySelect.count()) === 0) {
+      console.warn("[base] category select not found for", categoryLabel);
+      return false;
+    }
+    try {
+      await categorySelect.selectOption({ label: categoryLabel });
+      return true;
+    } catch {
+      console.warn("[base] category option not selectable", categoryLabel);
+      return false;
+    }
+  }
+
+  async fillShippingMethod(method: string | null): Promise<boolean> {
+    if (!method) return false;
+    const shippingSelect = this.page
+      .locator("select")
+      .filter({ has: this.page.locator("option:has-text('宅配便')") })
+      .first();
+    if ((await shippingSelect.count()) === 0) {
+      console.warn("[base] shipping method select not found");
+      return false;
+    }
+    try {
+      await shippingSelect.selectOption({ label: method });
+      return true;
+    } catch {
+      console.warn("[base] shipping method not selectable", method);
+      return false;
+    }
+  }
+
   async submitForm() {
     await Promise.all([
       this.page.waitForLoadState("networkidle"),
