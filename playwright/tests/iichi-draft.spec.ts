@@ -5,7 +5,7 @@ import { IichiPage } from "./page-objects/iichi-page";
 import { pickFirstNonEmpty, parseInteger, parseImageUrls, cleanupTempFiles } from "./shared/utils";
 
 const RUN_IICHI_FLOW = process.env.PLAYWRIGHT_RUN_IICHI === "true";
-const ENABLE_IICHI_CATEGORY_SELECTION = false;
+const ENABLE_IICHI_CATEGORY_SELECTION = true;
 
 test.describe("iichi 自動化フロー", () => {
   test.skip(!RUN_IICHI_FLOW, "PLAYWRIGHT_RUN_IICHI=true を指定したときのみ実行します。");

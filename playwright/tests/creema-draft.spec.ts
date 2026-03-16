@@ -15,9 +15,6 @@ console.log(
   "[creema-draft] PLAYWRIGHT_RUN_CREEMA=",
   JSON.stringify(process.env.PLAYWRIGHT_RUN_CREEMA)
 );
-const CREEMA_LOGIN_PATH = "/user/login";
-const CREEMA_AFTER_LOGIN_PATH = "/my/home";
-const CREEMA_NEW_ITEM_PATH = "/my/item/create";
 
 const CREEMA_MATERIAL_OPTIONS = [
   { id: "2", label: "シルバー", aliases: ["銀", "silver", "sv"] },
@@ -140,27 +137,8 @@ test.describe("Creema 自動化フロー", () => {
     const creemaPage = new CreemaPage(page);
     const origin = baseURL ?? "https://www.creema.jp";
 
-    testInfo.annotations.push({
-      type: "TODO",
-      description:
-        "selectors オブジェクトを実際の Creema 画面に合わせて調整してください。",
-    });
-
-    await test.step("ログインページへ遷移", async () => {
-      await page.goto(`${origin}${CREEMA_LOGIN_PATH}`);
-      await expect(page).toHaveURL(/\/user\/login/);
-    });
-
-    await test.step("認証情報を入力", async () => {
-      await creemaPage.loginEmail.fill(email!);
-      await creemaPage.loginPassword.fill(password!);
-      await Promise.all([
-        page.waitForURL(
-          `${origin}${CREEMA_AFTER_LOGIN_PATH}`,
-          { timeout: 120_000 }
-        ),
-        creemaPage.loginSubmit.click(),
-      ]);
+    await test.step("ログイン", async () => {
+      await creemaPage.login(email!, password!, origin);
     });
 
     await test.step("商品登録画面を開く", async () => {
@@ -214,15 +192,8 @@ test.describe("Creema 自動化フロー", () => {
         await creemaPage.goToShippingStep();
 
         if (mapped.shippingOriginPrefectureId) {
-          const success = await creemaPage.setSelectValue(
-            "select[name='item[delivery_from_prefecture_id]']",
-            mapped.shippingOriginPrefectureId
-          );
-          if (!success) {
-            console.warn(
-              "[creema-draft] shipping origin option not selectable",
-              mapped.shippingOriginPrefectureId
-            );
+          if (!(await creemaPage.fillShippingOrigin(mapped.shippingOriginPrefectureId))) {
+            console.warn("[creema-draft] shipping origin not selectable", mapped.shippingOriginPrefectureId);
           }
         } else if (
           pickFirstNonEmpty(
@@ -236,15 +207,8 @@ test.describe("Creema 自動化フロー", () => {
         }
 
         if (mapped.shippingMethodId) {
-          const success = await creemaPage.setSelectValue(
-            "select[name='item[shipping_methods][]']",
-            mapped.shippingMethodId
-          );
-          if (!success) {
-            console.warn(
-              "[creema-draft] shipping method not selectable",
-              mapped.shippingMethodId
-            );
+          if (!(await creemaPage.fillShippingMethod(mapped.shippingMethodId))) {
+            console.warn("[creema-draft] shipping method not selectable", mapped.shippingMethodId);
           }
         } else if (
           pickFirstNonEmpty(
@@ -257,15 +221,8 @@ test.describe("Creema 自動化フロー", () => {
         }
 
         if (mapped.craftPeriodId) {
-          const success = await creemaPage.setSelectValue(
-            "select[name='item[craft_period]']",
-            mapped.craftPeriodId
-          );
-          if (!success) {
-            console.warn(
-              "[creema-draft] craft period not selectable",
-              mapped.craftPeriodId
-            );
+          if (!(await creemaPage.fillCraftPeriod(mapped.craftPeriodId))) {
+            console.warn("[creema-draft] craft period not selectable", mapped.craftPeriodId);
           }
         } else if (
           pickFirstNonEmpty(
@@ -278,11 +235,7 @@ test.describe("Creema 自動化フロー", () => {
         }
 
         if (mapped.sizeFreeInput) {
-          const success = await creemaPage.setTextareaValue(
-            "#form-item-size-freeinput",
-            mapped.sizeFreeInput
-          );
-          if (!success) {
+          if (!(await creemaPage.fillSizeFreeInput(mapped.sizeFreeInput))) {
             console.warn("[creema-draft] size textarea not fillable", mapped.sizeFreeInput);
           }
         }

@@ -260,6 +260,35 @@ export class CreemaPage {
     );
   }
 
+  async fillShippingOrigin(prefectureId: string | null): Promise<boolean> {
+    if (!prefectureId) return false;
+    return this.setSelectValue(
+      "select[name='item[delivery_from_prefecture_id]']",
+      prefectureId
+    );
+  }
+
+  async fillShippingMethod(methodId: string | null): Promise<boolean> {
+    if (!methodId) return false;
+    return this.setSelectValue(
+      "select[name='item[shipping_methods][]']",
+      methodId
+    );
+  }
+
+  async fillCraftPeriod(periodId: string | null): Promise<boolean> {
+    if (!periodId) return false;
+    return this.setSelectValue(
+      "select[name='item[craft_period]']",
+      periodId
+    );
+  }
+
+  async fillSizeFreeInput(text: string | null): Promise<boolean> {
+    if (!text) return false;
+    return this.setTextareaValue("#form-item-size-freeinput", text);
+  }
+
   async confirmAndSaveDraft() {
     await expect(this.confirmButton).toBeVisible();
     await Promise.all([
