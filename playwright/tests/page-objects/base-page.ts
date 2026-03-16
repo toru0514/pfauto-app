@@ -52,14 +52,12 @@ export class BasePage {
       "input.m-uploadBox__input[type='file']"
     );
 
-    // Publish toggle
-    this.publishInput = page
-      .locator('label')
-      .filter({ hasText: '非公開' })
-      .locator('input[type="checkbox"]');
+    // Publish toggle — uses .c-checkbox component (not a <label>)
     this.publishToggleArea = page
-      .locator('label')
+      .locator('.c-checkbox')
       .filter({ hasText: '非公開' });
+    this.publishInput = this.publishToggleArea
+      .locator('input[type="checkbox"]');
 
     // Navigation
     this.registerButton = page
