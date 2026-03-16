@@ -6,9 +6,6 @@ import { downloadImages, cleanupTempFiles } from "../shared/utils";
 
 /**
  * Page Object for BASE product creation form.
- *
- * TODO: Replace selectors with codegen-generated ones.
- * Run: npx playwright codegen https://admin.thebase.com/shop_admin/items/add
  */
 export class BasePage {
   readonly page: Page;
@@ -47,21 +44,22 @@ export class BasePage {
       .first();
 
     // Form fields
-    this.titleInput = page.locator("#itemDetail_name");
-    this.descriptionInput = page.locator("#itemDetail_detail");
-    this.priceInput = page.locator("#itemDetail_price");
-    this.stockInput = page.locator("#itemDetail_stock");
+    this.titleInput = page.getByRole('textbox', { name: '商品名' });
+    this.descriptionInput = page.getByRole('textbox', { name: '商品説明' });
+    this.priceInput = page.getByRole('textbox', { name: /価格/ });
+    this.stockInput = page.getByRole('textbox', { name: /在庫/ });
     this.imageFileInput = page.locator(
       "input.m-uploadBox__input[type='file']"
     );
 
     // Publish toggle
-    this.publishInput = page.locator(
-      'xpath=//p[contains(normalize-space(),"公開する")]/ancestor::*[self::label or contains(@class,"c-checkbox")][1]//input[@type="checkbox"] | //input[@type="checkbox"][contains(@name,"publish")] | //input[@type="checkbox"][contains(@id,"publish")]'
-    );
-    this.publishToggleArea = page.locator(
-      'xpath=//p[contains(normalize-space(),"公開する")]/ancestor::*[self::label or contains(@class,"c-checkbox")]'
-    );
+    this.publishInput = page
+      .locator('label')
+      .filter({ hasText: '非公開' })
+      .locator('input[type="checkbox"]');
+    this.publishToggleArea = page
+      .locator('label')
+      .filter({ hasText: '非公開' });
 
     // Navigation
     this.registerButton = page
@@ -165,10 +163,7 @@ export class BasePage {
       imageFiles = [fallback];
     }
     if (imageFiles.length) {
-      await this.page.setInputFiles(
-        "input.m-uploadBox__input[type='file']",
-        imageFiles
-      );
+      await this.imageFileInput.setInputFiles(imageFiles);
     }
     return tempFiles; // Caller is responsible for cleanup
   }

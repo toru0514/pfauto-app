@@ -6,9 +6,6 @@ import { downloadImages, cleanupTempFiles } from "../shared/utils";
 
 /**
  * Page Object for minne product creation form.
- *
- * TODO: Replace selectors with codegen-generated ones.
- * Run: npx playwright codegen https://minne.com/account/products/new
  */
 export class MinnePage {
   readonly page: Page;
@@ -41,15 +38,13 @@ export class MinnePage {
     this.loginSubmit = page.locator("input.c-magic-link-sending-button");
 
     // Form fields
-    this.titleInput = page.locator("#name");
-    this.categoryParentSelect = page.locator("#category");
-    this.categoryChildSelect = page
-      .locator("select[aria-label*='小カテゴリー']")
-      .first();
-    this.descriptionTextarea = page.locator("#description");
-    this.priceInput = page.locator("#price");
-    this.stockInput = page.locator("#stock-unit");
-    this.shippingDaysInput = page.locator("#shipping-days");
+    this.titleInput = page.getByRole('textbox', { name: /作品名/ });
+    this.categoryParentSelect = page.getByLabel('大カテゴリー');
+    this.categoryChildSelect = page.getByLabel('小カテゴリー');
+    this.descriptionTextarea = page.getByRole('textbox', { name: /作品説明/ });
+    this.priceInput = page.getByRole('spinbutton', { name: /販売価格/ });
+    this.stockInput = page.getByRole('spinbutton', { name: /在庫と単位/ });
+    this.shippingDaysInput = page.getByRole('spinbutton', { name: /発送までの目安/ });
     this.imageFileInput = page.locator("input[type='file']").first();
     this.shippingMethodSelect = page.locator("#shipping-method-shipped-by-0");
     this.shippingAreaInput = page.locator("#shipping-method-shipped-to-0");
@@ -58,11 +53,8 @@ export class MinnePage {
       "#shipping-method-additional-cost-0"
     );
     this.submitButton = page
-      .locator("button.gtm-products-new-submit-click-tracking-web-front")
-      .first();
-    this.flashSuccess = page.locator(
-      "p.AccountPhysicalProductPage_flash-message-success__CI_ug"
-    );
+      .getByRole('button', { name: 'この内容で登録・更新する' });
+    this.flashSuccess = page.locator('[class*="flash-message-success"]');
   }
 
   async sendLoginLink(email: string) {

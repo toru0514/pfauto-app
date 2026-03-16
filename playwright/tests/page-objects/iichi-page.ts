@@ -6,19 +6,12 @@ import { downloadImages, cleanupTempFiles } from "../shared/utils";
 
 /**
  * Page Object for iichi product creation form.
- *
- * TODO: Replace selectors with codegen-generated ones.
- * Run: npx playwright codegen https://www.iichi.com/your/item/create
- *
- * NOTE: Many selectors use CSS module hashes (e.g. --MsSNs, --y8Xy7)
- * which break on every rebuild. These MUST be replaced with stable selectors.
  */
 export class IichiPage {
   readonly page: Page;
   private static readonly ROOT_URL = "https://www.iichi.com";
 
   // --- Login selectors ---
-  // WARNING: CSS module hashes - will break on rebuild!
   readonly loginLink: Locator;
   readonly loginEmail: Locator;
   readonly loginPassword: Locator;
@@ -33,20 +26,18 @@ export class IichiPage {
   readonly imageFileInput: Locator;
   readonly saveButton: Locator;
 
-  // WARNING: CSS module hash - will break on rebuild!
   readonly successPopupTitle: Locator;
 
   constructor(page: Page) {
     this.page = page;
 
     // Login
-    this.loginLink = page
-      .locator("a.HeaderIcons__text--MsSNs[href='/signin']")
-      .first();
+    this.loginLink = page.locator("a[href='/signin']").first();
     this.loginEmail = page.locator("input[name='email']");
     this.loginPassword = page.locator("input[name='password']");
     this.loginContainer = page
-      .locator(".SigninSignupForm__container--y8Xy7")
+      .locator("form")
+      .filter({ has: page.locator("input[name='email']") })
       .first();
     this.loginSubmitButton = page
       .locator("button[type='submit'], input[type='submit']")
@@ -63,7 +54,7 @@ export class IichiPage {
     this.saveButton = page.getByRole("button", { name: /保存/ }).first();
 
     // Success indicator
-    this.successPopupTitle = page.locator(".AfterPostPopup__title--jnwVU");
+    this.successPopupTitle = page.getByText(/保存されました/);
   }
 
   async navigateToLogin() {
