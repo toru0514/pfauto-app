@@ -6,6 +6,10 @@ import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { googleSheetsProductRepository } from "@/adapters/google-sheets/product-repository";
 import type { SpreadsheetProductRecord } from "@/application/types/product";
+import {
+  resolveMinneParentIdByLabel,
+  resolveMinneChildIdByLabel,
+} from "./minne-categories";
 
 const RUN_MINNE_FLOW = process.env.PLAYWRIGHT_RUN_MINNE === "true";
 const MINNE_LOGIN_URL = "https://minne.com/signin";
@@ -212,14 +216,29 @@ function mapProductToMinneDraft(product: SpreadsheetProductRecord): MinneDraftMa
   const shippingAdditionalValue =
     parseInteger(product.raw["minne_shipping_additional_fee"]);
 
+  // カテゴリ: ラベル列またはID列から解決
+  const categoryParentLabel = product.raw["minne_category_parent_label"];
+  const categoryChildLabel = product.raw["minne_category_label"];
+
+  let categoryParentId = normalizeId(product.raw["minne_category_parent_id"]);
+  let categoryId = normalizeId(product.raw["minne_category_id"]);
+
+  // ラベルからIDを解決（ID列がない場合のフォールバック）
+  if (!categoryParentId && categoryParentLabel) {
+    categoryParentId = resolveMinneParentIdByLabel(categoryParentLabel);
+  }
+  if (!categoryId && categoryParentLabel && categoryChildLabel) {
+    categoryId = resolveMinneChildIdByLabel(categoryParentLabel, categoryChildLabel);
+  }
+
   return {
     title,
     description,
     price: Math.max(50, priceValue).toString(),
     stock: Math.max(1, stockValue).toString(),
     shippingDays: Math.min(120, Math.max(0, shippingDaysValue)).toString(),
-    categoryParentId: normalizeId(product.raw["minne_category_parent_id"]),
-    categoryId: normalizeId(product.raw["minne_category_id"]),
+    categoryParentId,
+    categoryId,
     shippingMethod: pickFirstNonEmpty(
       product.raw["minne_shipping_method"],
       product.raw["shipping_method"]

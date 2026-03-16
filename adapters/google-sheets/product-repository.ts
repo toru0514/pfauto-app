@@ -10,12 +10,75 @@ import type {
 import type { JobStatus, ProductStatus } from "@/application/types/status";
 import { getLogger } from "@/lib/logger";
 import { getGoogleSheetsRateLimiter } from "@/lib/rate-limiter";
+import {
+  resolveMinneParentIdByLabel,
+  resolveMinneChildIdByLabel,
+} from "@/playwright/tests/minne-categories";
 
 const log = getLogger("google-sheets-repository");
 const rateLimiter = getGoogleSheetsRateLimiter();
 
 const DEFAULT_SHEET_TITLE = "シート1";
 const VALUE_RANGE = "A1:ZZ"; // covers columns A-ZZ (~702 columns)
+
+// マルチシート構成の設定
+type SheetConfig = {
+  common: string;
+  creema: string;
+  minne: string;
+  base: string;
+  iichi: string;
+};
+
+type AllSheetsData = {
+  common: SheetMatrix;
+  platforms: {
+    creema: SheetMatrix | null;
+    minne: SheetMatrix | null;
+    base: SheetMatrix | null;
+    iichi: SheetMatrix | null;
+  };
+};
+
+// iichi用マッピングテーブル
+const IICHI_SHIPPING_METHOD_MAP: Record<string, string> = {
+  クリックポスト: "クリックポスト",
+  宅急便コンパクト: "宅急便コンパクト",
+  ゆうパック: "ゆうパック",
+  レターパック: "レターパック",
+  レターパックプラス: "レターパックプラス",
+  レターパックライト: "レターパックライト",
+  ネコポス: "ネコポス",
+  宅急便: "宅急便",
+  定形外郵便: "定形外郵便",
+  普通郵便: "普通郵便",
+  ゆうメール: "ゆうメール",
+  佐川急便: "佐川急便",
+};
+
+const IICHI_MATERIAL_MAP: Record<string, string> = {
+  木材: "木材",
+  木: "木材",
+  ウッド: "木材",
+  真鍮: "真鍮",
+  ガラス: "ガラス",
+  陶器: "陶器",
+  磁器: "磁器",
+  布: "布",
+  革: "革",
+  レザー: "革",
+  金属: "金属",
+  銀: "銀",
+  シルバー: "銀",
+  銅: "銅",
+  鉄: "鉄",
+  ステンレス: "ステンレス",
+  樹脂: "樹脂",
+  プラスチック: "樹脂",
+  紙: "紙",
+  竹: "竹",
+  漆: "漆",
+};
 const MOCK_SHEET_MATRIX: SheetMatrix = {
   headerRow: [
     "product_id",
@@ -109,6 +172,19 @@ const HEADER_ALIASES = {
 
 const PLATFORM_PREFIXES = ["creema", "minne", "base", "iichi"];
 
+// 共通シートの列エイリアス
+const COMMON_HEADER_ALIASES = {
+  sku: ["sku", "SKU"],
+  material: ["material", "素材"],
+  sizeNotes: ["size_notes", "サイズ備考"],
+  weightGrams: ["weight_grams", "重量", "重量g"],
+  imageUrls: ["image_urls", "画像URL", "画像"],
+  productionLeadTimeDays: ["production_lead_time_days", "制作日数", "リードタイム"],
+  shippingFee: ["shipping_fee", "送料"],
+  shippingMethod: ["shipping_method", "配送方法"],
+  shippingOriginPref: ["shipping_origin_pref", "発送元"],
+};
+
 type SheetMatrix = {
   headerRow: string[];
   rows: string[][];
@@ -162,6 +238,29 @@ function getSpreadsheetId(): string {
 
 function getSheetTitle(): string {
   return process.env.GOOGLE_SHEETS_WORKSHEET_TITLE || DEFAULT_SHEET_TITLE;
+}
+
+function getSheetConfig(): SheetConfig {
+  return {
+    common: process.env.GOOGLE_SHEETS_COMMON_SHEET || "共通",
+    creema: process.env.GOOGLE_SHEETS_CREEMA_SHEET || "Creema",
+    minne: process.env.GOOGLE_SHEETS_MINNE_SHEET || "minne",
+    base: process.env.GOOGLE_SHEETS_BASE_SHEET || "BASE",
+    iichi: process.env.GOOGLE_SHEETS_IICHI_SHEET || "iichi",
+  };
+}
+
+function isMultiSheetMode(): boolean {
+  // 共通シートの環境変数が設定されていればマルチシートモード
+  return !!process.env.GOOGLE_SHEETS_COMMON_SHEET;
+}
+
+function mapToIichiShippingLabel(method: string): string {
+  return IICHI_SHIPPING_METHOD_MAP[method] ?? method;
+}
+
+function mapToIichiMaterialLabel(material: string): string {
+  return IICHI_MATERIAL_MAP[material] ?? material;
 }
 
 function normalizeHeaderName(value: string): string {
@@ -297,6 +396,16 @@ function buildRawRecord(headerRow: string[], row: string[]): Record<string, stri
 
 export class GoogleSheetsProductRepository implements ProductRepositoryPort {
   async listProducts(): Promise<SpreadsheetProductRecord[]> {
+    // マルチシートモードの場合は新しい読み込みロジックを使用
+    if (isMultiSheetMode()) {
+      return this.listProductsMultiSheet();
+    }
+
+    // 従来のシングルシートモード
+    return this.listProductsSingleSheet();
+  }
+
+  private async listProductsSingleSheet(): Promise<SpreadsheetProductRecord[]> {
     const matrix = await this.fetchSheetMatrix();
     if (!matrix) return [];
     const { headerRow, rows } = matrix;
@@ -365,6 +474,155 @@ export class GoogleSheetsProductRepository implements ProductRepositoryPort {
     return records;
   }
 
+  private async listProductsMultiSheet(): Promise<SpreadsheetProductRecord[]> {
+    const allData = await this.fetchAllSheetMatrices();
+    if (!allData) return [];
+
+    const { common, platforms } = allData;
+    const { headerRow: commonHeader, rows: commonRows } = common;
+
+    // 共通シートの列インデックスを取得
+    const productIdIndex = findColumnIndex(commonHeader, HEADER_ALIASES.productId);
+    const titleIndex = findColumnIndex(commonHeader, HEADER_ALIASES.title);
+    const descriptionIndex = findColumnIndex(commonHeader, HEADER_ALIASES.description);
+    const priceIndex = findColumnIndex(commonHeader, HEADER_ALIASES.price);
+    const inventoryIndex = findColumnIndex(commonHeader, HEADER_ALIASES.inventory);
+    const tagsIndex = findColumnIndex(commonHeader, HEADER_ALIASES.tags);
+    const platformsIndex = findColumnIndex(commonHeader, HEADER_ALIASES.platforms);
+    const syncStatusIndex = findColumnIndex(commonHeader, HEADER_ALIASES.syncStatus);
+    const lastSyncedAtIndex = findColumnIndex(commonHeader, HEADER_ALIASES.lastSyncedAt);
+    const lastErrorIndex = findColumnIndex(commonHeader, HEADER_ALIASES.lastError);
+
+    // 各PFシートのproduct_idインデックスマップを構築
+    const pfProductIdIndexes: Record<string, number | null> = {};
+    const pfRowsByProductId: Record<string, Record<string, { row: string[]; header: string[] }>> = {};
+
+    for (const [pfName, pfMatrix] of Object.entries(platforms)) {
+      if (!pfMatrix) continue;
+      const pfProductIdIdx = findColumnIndex(pfMatrix.headerRow, HEADER_ALIASES.productId);
+      pfProductIdIndexes[pfName] = pfProductIdIdx;
+      pfRowsByProductId[pfName] = {};
+
+      if (pfProductIdIdx !== null) {
+        for (const row of pfMatrix.rows) {
+          const pid = row[pfProductIdIdx];
+          if (pid) {
+            pfRowsByProductId[pfName][pid] = { row, header: pfMatrix.headerRow };
+          }
+        }
+      }
+    }
+
+    const records: SpreadsheetProductRecord[] = [];
+
+    commonRows.forEach((commonRow, rowIndex) => {
+      const rowNumber = rowIndex + 2;
+      const productId = productIdIndex !== null ? commonRow[productIdIndex] ?? "" : "";
+      if (!productId) return;
+
+      // 共通シートからベース値を取得
+      const baseRaw = buildRawRecord(commonHeader, commonRow);
+
+      // 各PFシートから上書き値をマージ
+      const mergedRaw: Record<string, string> = { ...baseRaw };
+      const allPlatformSnapshots: PlatformJobSnapshot[] = [];
+
+      for (const [pfName, pfData] of Object.entries(pfRowsByProductId)) {
+        const pfRecord = pfData[productId];
+        if (!pfRecord) continue;
+
+        const { row: pfRow, header: pfHeader } = pfRecord;
+        const pfRaw = buildRawRecord(pfHeader, pfRow);
+
+        // PF固有列をマージ（プレフィックス付きの列）
+        for (const [key, value] of Object.entries(pfRaw)) {
+          const normalizedKey = normalizeHeaderName(key);
+          // PF固有列（プレフィックス付き）または上書き値がある場合のみマージ
+          if (normalizedKey.startsWith(pfName) || (value && !baseRaw[key])) {
+            mergedRaw[key] = value;
+          }
+          // 共通列の上書き: 値が存在し、空でない場合は上書き
+          if (value && baseRaw[key] !== undefined && value !== baseRaw[key]) {
+            // 上書きフラグとして _override_ プレフィックスをつける
+            mergedRaw[`${pfName}_override_${key}`] = value;
+          }
+        }
+
+        // PFスナップショットを抽出
+        const pfSnapshots = extractPlatformSnapshots(pfRaw);
+        allPlatformSnapshots.push(...pfSnapshots);
+      }
+
+      // iichi用のマッピングを適用
+      const materialIndex = findColumnIndex(commonHeader, COMMON_HEADER_ALIASES.material);
+      const shippingMethodIndex = findColumnIndex(commonHeader, COMMON_HEADER_ALIASES.shippingMethod);
+
+      if (materialIndex !== null && commonRow[materialIndex]) {
+        mergedRaw["iichi_material_label"] = mapToIichiMaterialLabel(commonRow[materialIndex]);
+      }
+      if (shippingMethodIndex !== null && commonRow[shippingMethodIndex]) {
+        mergedRaw["iichi_shipping_method_label"] = mapToIichiShippingLabel(commonRow[shippingMethodIndex]);
+      }
+
+      // minne用: ラベル→ID変換
+      const minneParentLabel = mergedRaw["minne_category_parent_label"];
+      const minneChildLabel = mergedRaw["minne_category_label"];
+
+      if (minneParentLabel) {
+        const parentId = resolveMinneParentIdByLabel(minneParentLabel);
+        if (parentId) {
+          mergedRaw["minne_category_parent_id"] = parentId;
+        }
+      }
+      if (minneParentLabel && minneChildLabel) {
+        const childId = resolveMinneChildIdByLabel(minneParentLabel, minneChildLabel);
+        if (childId) {
+          mergedRaw["minne_category_id"] = childId;
+        }
+      }
+
+      // 既存のスナップショットを共通シートから抽出してマージ
+      const commonSnapshots = extractPlatformSnapshots(baseRaw);
+      for (const cs of commonSnapshots) {
+        // PFシートからのスナップショットがなければ共通シートのを使用
+        if (!allPlatformSnapshots.some(ps => ps.platform === cs.platform)) {
+          allPlatformSnapshots.push(cs);
+        }
+      }
+
+      const title = titleIndex !== null ? commonRow[titleIndex] ?? "" : "";
+      const description = descriptionIndex !== null ? commonRow[descriptionIndex] ?? "" : "";
+      const price = priceIndex !== null ? parseNumber(commonRow[priceIndex]) : null;
+      const inventory = inventoryIndex !== null ? parseNumber(commonRow[inventoryIndex]) : null;
+      const tags = tagsIndex !== null ? splitMultiValue(commonRow[tagsIndex]) : [];
+      const platformsList = platformsIndex !== null
+        ? splitMultiValue(commonRow[platformsIndex]).map(normalizePlatformName)
+        : [];
+      const syncStatusRaw = syncStatusIndex !== null ? commonRow[syncStatusIndex] ?? "" : "";
+      const syncStatus = normalizeProductStatus(syncStatusRaw);
+      const lastSyncedAt = lastSyncedAtIndex !== null ? commonRow[lastSyncedAtIndex] ?? null : null;
+      const lastError = lastErrorIndex !== null ? commonRow[lastErrorIndex] ?? null : null;
+
+      records.push({
+        rowNumber,
+        id: productId,
+        title,
+        description,
+        price,
+        inventory,
+        tags,
+        platforms: platformsList,
+        syncStatus,
+        lastSyncedAt,
+        lastError,
+        platformSnapshots: allPlatformSnapshots,
+        raw: mergedRaw,
+      });
+    });
+
+    return records;
+  }
+
   async findProductById(
     productId: string
   ): Promise<SpreadsheetProductRecord | null> {
@@ -380,6 +638,17 @@ export class GoogleSheetsProductRepository implements ProductRepositoryPort {
       return;
     }
 
+    // マルチシートモードの場合
+    if (isMultiSheetMode()) {
+      await this.updateProductStatusesMultiSheet(input);
+      return;
+    }
+
+    // 従来のシングルシートモード
+    await this.updateProductStatusesSingleSheet(input);
+  }
+
+  private async updateProductStatusesSingleSheet(input: UpdateProductStatusInput): Promise<void> {
     try {
       const matrix = await this.fetchSheetMatrix();
       if (!matrix) return;
@@ -514,6 +783,159 @@ export class GoogleSheetsProductRepository implements ProductRepositoryPort {
     }
   }
 
+  private async updateProductStatusesMultiSheet(input: UpdateProductStatusInput): Promise<void> {
+    try {
+      const config = getSheetConfig();
+      const allData = await this.fetchAllSheetMatrices();
+      if (!allData) return;
+
+      const { common, platforms } = allData;
+      const commonHeader = common.headerRow;
+      const commonRows = common.rows;
+
+      // 共通シートでproduct_idを検索
+      const productIdIndex = findColumnIndex(commonHeader, HEADER_ALIASES.productId);
+      if (productIdIndex === null) {
+        throw new Error("共通シートに product_id 列が見つかりませんでした。");
+      }
+
+      let commonRowNumber: number | null = null;
+      commonRows.forEach((row, rowIndex) => {
+        if (row[productIdIndex] === input.productId) {
+          commonRowNumber = rowIndex + 2;
+        }
+      });
+
+      if (!commonRowNumber) {
+        throw new Error(`product_id=${input.productId} が共通シートに見つかりませんでした。`);
+      }
+
+      const updates: sheets_v4.Schema$ValueRange[] = [];
+
+      // 共通シートへの更新（ステータス、最終同期、エラーなど共通管理列）
+      if (input.syncStatus) {
+        const index = findColumnIndex(commonHeader, HEADER_ALIASES.syncStatus);
+        if (index !== null) {
+          updates.push({
+            range: `'${config.common}'!${columnIndexToLetter(index)}${commonRowNumber}`,
+            values: [[input.syncStatus]],
+          });
+        }
+      }
+
+      if (input.clearErrorsForPlatforms?.length) {
+        const commonErrorIndex = findColumnIndex(commonHeader, HEADER_ALIASES.lastError);
+        if (commonErrorIndex !== null) {
+          updates.push({
+            range: `'${config.common}'!${columnIndexToLetter(commonErrorIndex)}${commonRowNumber}`,
+            values: [[""]],
+          });
+        }
+      }
+
+      if ("note" in input) {
+        const noteIndex = findColumnIndex(commonHeader, HEADER_ALIASES.note);
+        if (noteIndex !== null) {
+          updates.push({
+            range: `'${config.common}'!${columnIndexToLetter(noteIndex)}${commonRowNumber}`,
+            values: [[input.note ?? ""]],
+          });
+        }
+      }
+
+      // 各PFシートへの更新
+      const pfSheetConfig: Record<string, { sheet: string; matrix: SheetMatrix | null }> = {
+        creema: { sheet: config.creema, matrix: platforms.creema },
+        minne: { sheet: config.minne, matrix: platforms.minne },
+        base: { sheet: config.base, matrix: platforms.base },
+        iichi: { sheet: config.iichi, matrix: platforms.iichi },
+      };
+
+      for (const [platform, { sheet: pfSheet, matrix: pfMatrix }] of Object.entries(pfSheetConfig)) {
+        if (!pfMatrix) continue;
+
+        const pfProductIdIndex = findColumnIndex(pfMatrix.headerRow, HEADER_ALIASES.productId);
+        if (pfProductIdIndex === null) continue;
+
+        let pfRowNumber: number | null = null;
+        pfMatrix.rows.forEach((row, rowIndex) => {
+          if (row[pfProductIdIndex] === input.productId) {
+            pfRowNumber = rowIndex + 2;
+          }
+        });
+
+        if (!pfRowNumber) continue;
+
+        // プラットフォームステータス更新
+        if (input.platformStatuses?.[platform]) {
+          const alias = [`${platform}_status`, `${platform}status`, "status"];
+          const index = findColumnIndex(pfMatrix.headerRow, alias);
+          if (index !== null) {
+            updates.push({
+              range: `'${pfSheet}'!${columnIndexToLetter(index)}${pfRowNumber}`,
+              values: [[input.platformStatuses[platform]]],
+            });
+          }
+        }
+
+        // 最終同期タイムスタンプ更新
+        if (input.lastSyncedTimestamps?.[platform]) {
+          const alias = [
+            `${platform}_last_synced_at`,
+            `${platform}lastsyncedat`,
+            "last_synced_at",
+          ];
+          const index = findColumnIndex(pfMatrix.headerRow, alias);
+          if (index !== null) {
+            updates.push({
+              range: `'${pfSheet}'!${columnIndexToLetter(index)}${pfRowNumber}`,
+              values: [[input.lastSyncedTimestamps[platform] ?? ""]],
+            });
+          }
+        }
+
+        // エラークリア
+        if (input.clearErrorsForPlatforms?.includes(platform)) {
+          const aliases = [
+            `${platform}_last_error`,
+            `${platform}_last_error_message`,
+            "last_error",
+          ];
+          const index = findColumnIndex(pfMatrix.headerRow, aliases);
+          if (index !== null) {
+            updates.push({
+              range: `'${pfSheet}'!${columnIndexToLetter(index)}${pfRowNumber}`,
+              values: [[""]],
+            });
+          }
+        }
+      }
+
+      if (!updates.length) return;
+
+      await rateLimiter.acquire();
+
+      const sheets = getSheetsClient();
+      await sheets.spreadsheets.values.batchUpdate({
+        spreadsheetId: getSpreadsheetId(),
+        requestBody: {
+          valueInputOption: "RAW",
+          data: updates,
+        },
+      });
+
+      log.info("マルチシート更新完了", {
+        productId: input.productId,
+        updatedFields: updates.length,
+      });
+    } catch (error) {
+      log.error("マルチシート更新失敗", error, {
+        productId: input.productId,
+      });
+      throw error;
+    }
+  }
+
   private async fetchSheetMatrix(): Promise<SheetMatrix | null> {
     if (shouldUseMockSheetData()) {
       return getMockSheetMatrix();
@@ -555,6 +977,91 @@ export class GoogleSheetsProductRepository implements ProductRepositoryPort {
       });
       throw error;
     }
+  }
+
+  private async fetchSheetMatrixByTitle(sheetTitle: string): Promise<SheetMatrix | null> {
+    try {
+      await rateLimiter.acquire();
+
+      const sheets = getSheetsClient();
+      const spreadsheetId = getSpreadsheetId();
+      const range = `${sheetTitle}!${VALUE_RANGE}`;
+
+      const { data } = await sheets.spreadsheets.values.get({
+        spreadsheetId,
+        range,
+        majorDimension: "ROWS",
+      });
+
+      const values = data.values ?? [];
+      if (!values.length) {
+        log.debug(`シート「${sheetTitle}」にデータがありません`, { spreadsheetId, range });
+        return {
+          headerRow: [],
+          rows: [],
+        };
+      }
+
+      const [headerRow, ...rows] = values;
+      log.debug(`シート「${sheetTitle}」読み込み完了`, {
+        headerCount: headerRow.length,
+        rowCount: rows.length,
+      });
+      return { headerRow, rows };
+    } catch (error) {
+      // シートが存在しない場合はnullを返す
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      if (errorMessage.includes("Unable to parse range") || errorMessage.includes("not found")) {
+        log.warn(`シート「${sheetTitle}」が見つかりません`, { sheetTitle });
+        return null;
+      }
+      log.error(`シート「${sheetTitle}」読み込み失敗`, error);
+      throw error;
+    }
+  }
+
+  private async fetchAllSheetMatrices(): Promise<AllSheetsData | null> {
+    if (shouldUseMockSheetData()) {
+      return {
+        common: getMockSheetMatrix(),
+        platforms: {
+          creema: null,
+          minne: null,
+          base: null,
+          iichi: null,
+        },
+      };
+    }
+
+    const config = getSheetConfig();
+
+    // 共通シートを取得（必須）
+    const common = await this.fetchSheetMatrixByTitle(config.common);
+    if (!common) {
+      log.error(`共通シート「${config.common}」が見つかりません`);
+      return null;
+    }
+
+    // 各PFシートを並列で取得
+    const [creema, minne, base, iichi] = await Promise.all([
+      this.fetchSheetMatrixByTitle(config.creema),
+      this.fetchSheetMatrixByTitle(config.minne),
+      this.fetchSheetMatrixByTitle(config.base),
+      this.fetchSheetMatrixByTitle(config.iichi),
+    ]);
+
+    log.info("マルチシート読み込み完了", {
+      common: common.rows.length,
+      creema: creema?.rows.length ?? 0,
+      minne: minne?.rows.length ?? 0,
+      base: base?.rows.length ?? 0,
+      iichi: iichi?.rows.length ?? 0,
+    });
+
+    return {
+      common,
+      platforms: { creema, minne, base, iichi },
+    };
   }
 }
 
