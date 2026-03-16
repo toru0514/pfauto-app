@@ -22,9 +22,9 @@ export class BasePage {
   readonly stockInput: Locator;
   readonly imageFileInput: Locator;
 
-  // --- Publish toggle ---
+  // --- Publish radio buttons (公開/非公開) ---
   readonly publishInput: Locator;
-  readonly publishToggleArea: Locator;
+  readonly unpublishRadio: Locator;
 
   // --- Navigation ---
   readonly registerButton: Locator;
@@ -52,12 +52,9 @@ export class BasePage {
       "input.m-uploadBox__input[type='file']"
     );
 
-    // Publish toggle — uses .c-checkbox component (not a <label>)
-    this.publishToggleArea = page
-      .locator('.c-checkbox')
-      .filter({ hasText: '非公開' });
-    this.publishInput = this.publishToggleArea
-      .locator('input[type="checkbox"]');
+    // Publish radio buttons (公開状態: 公開 / 非公開)
+    this.publishInput = page.getByRole('radio', { name: '公開', exact: true });
+    this.unpublishRadio = page.getByRole('radio', { name: '非公開' });
 
     // Navigation
     this.registerButton = page
@@ -65,12 +62,18 @@ export class BasePage {
       .first();
   }
 
-  async navigateToLogin() {
+  /** Navigate to login page. Returns true if already logged in (redirected to dashboard). */
+  async navigateToLogin(): Promise<boolean> {
     await this.page.goto(`${this.baseOrigin}/users/login`, {
-      waitUntil: "domcontentloaded",
+      waitUntil: "load",
     });
+    // Already logged in — redirected to dashboard
+    if (/\/(dashboard|shop_admin)/.test(this.page.url())) {
+      return true;
+    }
     await expect(this.page).toHaveURL(/\/users\/login/);
     await expect(this.page.locator("form")).toBeVisible();
+    return false;
   }
 
   async fillCredentials(email: string, password: string) {
@@ -106,43 +109,12 @@ export class BasePage {
 
   async uncheckPublish() {
     try {
-      await this.publishInput.first().waitFor({
-        state: "attached",
-        timeout: 5000,
-      });
-      const inputHandle = this.publishInput.first();
-      if (await inputHandle.isChecked()) {
-        try {
-          await inputHandle.setChecked(false, { force: true });
-        } catch {
-          // Fallback: click the label area
-        }
-      }
-      if (await inputHandle.isChecked()) {
-        await this.publishToggleArea.first().click({ force: true });
-      }
-      if (await inputHandle.isChecked()) {
-        await this.page.evaluate(() => {
-          const label = document.querySelector("p.c-checkbox__text");
-          if (label) {
-            const checkbox = label
-              .closest(".c-checkbox")
-              ?.querySelector(
-                "input[type='checkbox']"
-              ) as HTMLInputElement | null;
-            if (checkbox) {
-              checkbox.checked = false;
-              checkbox.dispatchEvent(
-                new Event("change", { bubbles: true })
-              );
-            }
-          }
-        });
+      await this.unpublishRadio.waitFor({ state: "attached", timeout: 5000 });
+      if (!(await this.unpublishRadio.isChecked())) {
+        await this.unpublishRadio.check({ force: true });
       }
     } catch {
-      console.warn(
-        "[base] 公開設定のチェックボックスを操作できませんでした"
-      );
+      console.warn("[base] 公開設定のラジオボタンを操作できませんでした");
     }
   }
 
