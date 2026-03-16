@@ -4,22 +4,16 @@ import { downloadImages, cleanupTempFiles } from "../shared/utils";
 
 /**
  * Page Object for Creema product creation form.
- *
- * Current selectors were captured from browser DevTools.
- * TODO: Replace with codegen-generated selectors for better resilience.
- * Run: npx playwright codegen https://www.creema.jp/my/item/create
  */
 export class CreemaPage {
   readonly page: Page;
 
   // --- Login selectors ---
-  // TODO: codegen で取得したセレクタに置き換え
   readonly loginEmail: Locator;
   readonly loginPassword: Locator;
   readonly loginSubmit: Locator;
 
   // --- Form selectors ---
-  // TODO: codegen で取得したセレクタに置き換え
   readonly titleInput: Locator;
   readonly descriptionInput: Locator;
   readonly priceInput: Locator;
@@ -50,9 +44,9 @@ export class CreemaPage {
     this.loginSubmit = page.locator("input.js-user-login-button");
 
     // Form fields
-    this.titleInput = page.locator("#form-item-title");
-    this.descriptionInput = page.locator("#form-item-description");
-    this.priceInput = page.locator("#form-item-price");
+    this.titleInput = page.getByRole('textbox', { name: /作品タイトル/ });
+    this.descriptionInput = page.getByRole('textbox', { name: /作品紹介文/ });
+    this.priceInput = page.getByRole('textbox', { name: /価格/ });
     this.stockSelect = page.locator("select.js-attach-stock");
     this.materialSelect = page.locator("#form-item-material-id");
     this.imageFileInput = page.locator("input.js-file-upload");
@@ -63,17 +57,17 @@ export class CreemaPage {
       "select[name='item[shipping_methods][]']"
     );
     this.craftPeriodSelect = page.locator("select[name='item[craft_period]']");
-    this.sizeTextarea = page.locator("#form-item-size-freeinput");
-    this.categoryLevel1Select = page.locator("#form-item-level1-category-id");
+    this.sizeTextarea = page.getByRole('textbox', { name: /500文字以内/ });
+    this.categoryLevel1Select = page.getByLabel('カテゴリ （必須）');
     this.categoryLevel2Select = page.locator("#form-item-level2-category-id");
     this.categoryLevel3Select = page.locator("#form-item-level3-category-id");
     this.colorCheckboxes = "input.js-item-skus-color-ids";
     this.tagHiddenInput = page.locator("#form-item-tags");
 
     // Navigation
-    this.nextStepButton = page.locator("input.js-item-next");
+    this.nextStepButton = page.getByRole('button', { name: '入力内容の確認' });
     this.confirmButton = page.locator("input.js-item-confirm");
-    this.saveDraftButton = page.locator("input.js-item-form-draft");
+    this.saveDraftButton = page.getByRole('button', { name: '保存する' });
   }
 
   async login(email: string, password: string, baseURL: string) {
@@ -166,7 +160,7 @@ export class CreemaPage {
     if (!files.length) return;
     try {
       await expect(this.imageFileInput).toBeAttached();
-      await this.page.setInputFiles("input.js-file-upload", files);
+      await this.imageFileInput.setInputFiles(files);
       await this.waitForImagePreview(files.length);
     } catch (error) {
       console.warn("[creema] image upload failed", error);
@@ -275,7 +269,7 @@ export class CreemaPage {
     await expect(this.page).toHaveURL(/\/my\/item\/input\/preview/);
 
     const saveButton = this.page
-      .locator(`input.js-item-form-draft[value="保存する"]:visible`)
+      .getByRole('button', { name: '保存する' })
       .first();
     await expect(saveButton).toBeVisible();
     await saveButton.scrollIntoViewIfNeeded();
