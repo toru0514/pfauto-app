@@ -27,7 +27,7 @@ export default defineConfig({
   projects: [
     {
       name: "creema-chromium",
-      testMatch: /creema-draft\.spec\.ts/,
+      testMatch: [/creema-draft\.spec\.ts/, /selector-health\.spec\.ts/],
       use: {
         ...sharedBrowserOptions,
         baseURL: creemaBaseUrl,
@@ -38,7 +38,7 @@ export default defineConfig({
     },
     {
       name: "minne-chromium",
-      testMatch: /minne-draft\.spec\.ts/,
+      testMatch: [/minne-draft\.spec\.ts/, /selector-health\.spec\.ts/],
       use: {
         ...sharedBrowserOptions,
         baseURL: "https://minne.com",
@@ -49,7 +49,7 @@ export default defineConfig({
     },
     {
       name: "base-chromium",
-      testMatch: /base-draft\.spec\.ts/,
+      testMatch: [/base-draft\.spec\.ts/, /selector-health\.spec\.ts/],
       use: {
         ...sharedBrowserOptions,
         baseURL: baseBaseUrl,
@@ -60,7 +60,7 @@ export default defineConfig({
     },
     {
       name: "iichi-chromium",
-      testMatch: /iichi-draft\.spec\.ts/,
+      testMatch: [/iichi-draft\.spec\.ts/, /selector-health\.spec\.ts/],
       use: {
         ...sharedBrowserOptions,
         baseURL: "https://www.iichi.com",
