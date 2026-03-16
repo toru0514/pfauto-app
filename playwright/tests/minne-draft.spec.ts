@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 import { googleSheetsProductRepository } from "@/adapters/google-sheets/product-repository";
 import type { SpreadsheetProductRecord } from "@/application/types/product";
 import { MinnePage } from "./page-objects/minne-page";
+import { GmailClient } from "./shared/gmail-client";
 import { pickFirstNonEmpty, parseInteger, parseImageUrls, normalizeId, cleanupTempFiles } from "./shared/utils";
 
 const RUN_MINNE_FLOW = process.env.PLAYWRIGHT_RUN_MINNE === "true";
@@ -13,6 +14,15 @@ test.describe("minne 自動化フロー", () => {
     const minneEmail = process.env.PLAYWRIGHT_MINNE_EMAIL;
     test.skip(!minneEmail, "PLAYWRIGHT_MINNE_EMAIL を設定してください。");
 
+    const gmailClientId = process.env.GOOGLE_CLIENT_ID;
+    const gmailClientSecret = process.env.GOOGLE_CLIENT_SECRET;
+    const gmailAccessToken = process.env.GMAIL_ACCESS_TOKEN;
+    const gmailRefreshToken = process.env.GMAIL_REFRESH_TOKEN;
+    test.skip(
+      !gmailClientId || !gmailClientSecret || !gmailAccessToken || !gmailRefreshToken,
+      "Gmail API credentials (GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GMAIL_ACCESS_TOKEN, GMAIL_REFRESH_TOKEN) を設定してください。"
+    );
+
     const products = await listProductsForMinne();
     console.log(
       "[minne-draft] ready products",
@@ -21,14 +31,24 @@ test.describe("minne 自動化フロー", () => {
     test.skip(!products.length, "minne 対象のシート商品が見つかりませんでした。");
 
     const minnePage = new MinnePage(page);
+    const gmailClient = new GmailClient({
+      clientId: gmailClientId!,
+      clientSecret: gmailClientSecret!,
+      accessToken: gmailAccessToken!,
+      refreshToken: gmailRefreshToken!,
+    });
+
+    let sentAfter: Date;
 
     await test.step("ログインリンクを送信", async () => {
+      sentAfter = new Date();
       await minnePage.sendLoginLink(minneEmail!);
-      testInfo.annotations.push({
-        type: "INFO",
-        description:
-          "メールに届く minne のログインリンクを開いてください。開いた後、Playwright Inspector で Resume を押すと次に進みます。",
-      });
+    });
+
+    await test.step("ログインリンクをメールから取得して開く", async () => {
+      const magicLink = await gmailClient.fetchMinneMagicLink(sentAfter);
+      console.log("[minne-draft] magic link obtained");
+      await minnePage.openLoginLink(magicLink);
     });
 
     await test.step("マイページを開く", async () => {

@@ -63,8 +63,10 @@ export class MinnePage {
     });
     await this.loginEmail.fill(email);
     await this.loginSubmit.click();
-    // User must manually click the magic link in their email, then resume.
-    await this.page.pause();
+  }
+
+  async openLoginLink(loginUrl: string) {
+    await this.page.goto(loginUrl, { waitUntil: "domcontentloaded" });
   }
 
   async navigateToHome() {
