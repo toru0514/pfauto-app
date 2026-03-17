@@ -42,11 +42,23 @@ export function AddProductModal({ pending, onSubmit, onClose }: Props) {
     );
   };
 
+  const priceError =
+    priceText.trim() && !Number.isFinite(Number(priceText.replace(/,/g, "")))
+      ? "数値を入力してください"
+      : null;
+
+  const inventoryError =
+    inventoryText.trim() && !Number.isFinite(Number(inventoryText))
+      ? "数値を入力してください"
+      : null;
+
   const canSubmit =
     !pending &&
     productId.trim().length > 0 &&
     title.trim().length > 0 &&
-    selectedPlatforms.length > 0;
+    selectedPlatforms.length > 0 &&
+    !priceError &&
+    !inventoryError;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -65,7 +77,12 @@ export function AddProductModal({ pending, onSubmit, onClose }: Props) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
+      onClick={(e) => {
+        if (e.target === e.currentTarget && !pending) onClose();
+      }}
+    >
       <div className="w-full max-w-lg overflow-hidden rounded-lg border border-border bg-card shadow-2xl">
         <div className="flex items-center justify-between border-b border-border bg-muted/50 px-4 py-3">
           <h2 className="text-lg font-semibold text-foreground">商品を追加</h2>
@@ -130,8 +147,11 @@ export function AddProductModal({ pending, onSubmit, onClose }: Props) {
                 onChange={(e) => setPriceText(e.target.value)}
                 placeholder="例: 3500"
                 disabled={pending}
-                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 disabled:opacity-60"
+                className={`w-full rounded-md border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 disabled:opacity-60 ${priceError ? "border-destructive" : "border-border"}`}
               />
+              {priceError && (
+                <p className="mt-1 text-xs text-destructive">{priceError}</p>
+              )}
             </div>
             <div>
               <label className="block text-xs font-medium text-muted-foreground mb-1">
@@ -144,8 +164,11 @@ export function AddProductModal({ pending, onSubmit, onClose }: Props) {
                 onChange={(e) => setInventoryText(e.target.value)}
                 placeholder="例: 5"
                 disabled={pending}
-                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 disabled:opacity-60"
+                className={`w-full rounded-md border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 disabled:opacity-60 ${inventoryError ? "border-destructive" : "border-border"}`}
               />
+              {inventoryError && (
+                <p className="mt-1 text-xs text-destructive">{inventoryError}</p>
+              )}
             </div>
           </div>
 

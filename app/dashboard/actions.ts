@@ -29,14 +29,31 @@ export async function enqueueDraft(productId: string, platforms: string[]) {
   revalidatePath("/");
 }
 
-export async function addProduct(input: {
-  productId: string;
-  title: string;
-  price: number | null;
-  inventory: number | null;
-  platforms: string[];
-}) {
-  await addProductUseCase(input);
+export async function addProduct(input: unknown) {
+  if (
+    typeof input !== "object" ||
+    input === null ||
+    typeof (input as Record<string, unknown>).productId !== "string" ||
+    typeof (input as Record<string, unknown>).title !== "string" ||
+    !Array.isArray((input as Record<string, unknown>).platforms) ||
+    !(input as Record<string, unknown[]>).platforms.every(
+      (v: unknown) => typeof v === "string"
+    )
+  ) {
+    throw new Error("不正な入力です。");
+  }
+
+  const raw = input as Record<string, unknown>;
+  const price = raw.price === null || typeof raw.price === "number" ? (raw.price as number | null) : null;
+  const inventory = raw.inventory === null || typeof raw.inventory === "number" ? (raw.inventory as number | null) : null;
+
+  await addProductUseCase({
+    productId: raw.productId as string,
+    title: raw.title as string,
+    price,
+    inventory,
+    platforms: raw.platforms as string[],
+  });
   revalidatePath("/dashboard");
   revalidatePath("/");
 }
