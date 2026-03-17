@@ -72,6 +72,44 @@ export async function enqueueDraftUseCase(
   });
 }
 
+export async function addProductUseCase(input: {
+  productId: string;
+  title: string;
+  price: number | null;
+  inventory: number | null;
+  platforms: string[];
+}): Promise<void> {
+  if (!input.productId.trim()) {
+    throw new Error("商品IDは必須です。");
+  }
+  if (!input.title.trim()) {
+    throw new Error("商品名は必須です。");
+  }
+
+  const normalizedPlatforms = input.platforms
+    .map((p) => p.trim().toLowerCase())
+    .filter(Boolean);
+
+  if (!normalizedPlatforms.length) {
+    throw new Error("出品先を1つ以上選択してください。");
+  }
+
+  const existing = await googleSheetsProductRepository.findProductById(
+    input.productId.trim()
+  );
+  if (existing) {
+    throw new Error(`商品ID "${input.productId}" は既に存在します。`);
+  }
+
+  await googleSheetsProductRepository.addProduct({
+    productId: input.productId.trim(),
+    title: input.title.trim(),
+    price: input.price,
+    inventory: input.inventory,
+    platforms: normalizedPlatforms,
+  });
+}
+
 function mapRecordToDashboardProduct(
   record: SpreadsheetProductRecord
 ): DashboardProduct {

@@ -1,0 +1,199 @@
+"use client";
+
+import { useState } from "react";
+
+const AVAILABLE_PLATFORMS = [
+  { value: "creema", label: "Creema" },
+  { value: "minne", label: "minne" },
+  { value: "base", label: "BASE" },
+  { value: "iichi", label: "iichi" },
+];
+
+export type AddProductFormData = {
+  productId: string;
+  title: string;
+  price: number | null;
+  inventory: number | null;
+  platforms: string[];
+};
+
+type Props = {
+  pending: boolean;
+  onSubmit: (data: AddProductFormData) => void;
+  onClose: () => void;
+};
+
+export function AddProductModal({ pending, onSubmit, onClose }: Props) {
+  const [productId, setProductId] = useState("");
+  const [title, setTitle] = useState("");
+  const [priceText, setPriceText] = useState("");
+  const [inventoryText, setInventoryText] = useState("");
+  const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([]);
+
+  const generateId = () => {
+    setProductId(`prod-${Date.now()}`);
+  };
+
+  const togglePlatform = (value: string) => {
+    setSelectedPlatforms((prev) =>
+      prev.includes(value)
+        ? prev.filter((p) => p !== value)
+        : [...prev, value]
+    );
+  };
+
+  const canSubmit =
+    !pending &&
+    productId.trim().length > 0 &&
+    title.trim().length > 0 &&
+    selectedPlatforms.length > 0;
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!canSubmit) return;
+
+    const price = priceText.trim() ? Number(priceText.replace(/,/g, "")) : null;
+    const inventory = inventoryText.trim() ? Number(inventoryText) : null;
+
+    onSubmit({
+      productId: productId.trim(),
+      title: title.trim(),
+      price: price !== null && Number.isFinite(price) ? price : null,
+      inventory: inventory !== null && Number.isFinite(inventory) ? inventory : null,
+      platforms: selectedPlatforms,
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+      <div className="w-full max-w-lg overflow-hidden rounded-lg border border-border bg-card shadow-2xl">
+        <div className="flex items-center justify-between border-b border-border bg-muted/50 px-4 py-3">
+          <h2 className="text-lg font-semibold text-foreground">商品を追加</h2>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={pending}
+            className="rounded-md border border-border px-3 py-1 text-xs text-muted-foreground transition hover:bg-muted disabled:opacity-60"
+          >
+            閉じる
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4 px-4 py-4">
+          <div>
+            <label className="block text-xs font-medium text-muted-foreground mb-1">
+              商品ID <span className="text-destructive">*</span>
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={productId}
+                onChange={(e) => setProductId(e.target.value)}
+                placeholder="例: ring-001"
+                disabled={pending}
+                className="flex-1 rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 disabled:opacity-60"
+              />
+              <button
+                type="button"
+                onClick={generateId}
+                disabled={pending}
+                className="shrink-0 rounded-md border border-border bg-muted px-3 py-2 text-xs font-medium text-muted-foreground transition hover:bg-muted/80 disabled:opacity-60"
+              >
+                自動生成
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-muted-foreground mb-1">
+              商品名 <span className="text-destructive">*</span>
+            </label>
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="例: シルバーリング"
+              disabled={pending}
+              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 disabled:opacity-60"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-medium text-muted-foreground mb-1">
+                価格
+              </label>
+              <input
+                type="text"
+                inputMode="numeric"
+                value={priceText}
+                onChange={(e) => setPriceText(e.target.value)}
+                placeholder="例: 3500"
+                disabled={pending}
+                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 disabled:opacity-60"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-muted-foreground mb-1">
+                在庫
+              </label>
+              <input
+                type="text"
+                inputMode="numeric"
+                value={inventoryText}
+                onChange={(e) => setInventoryText(e.target.value)}
+                placeholder="例: 5"
+                disabled={pending}
+                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 disabled:opacity-60"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-muted-foreground mb-1">
+              出品先 <span className="text-destructive">*</span>
+            </label>
+            <div className="flex flex-wrap gap-2 pt-1">
+              {AVAILABLE_PLATFORMS.map((platform) => {
+                const selected = selectedPlatforms.includes(platform.value);
+                return (
+                  <button
+                    key={platform.value}
+                    type="button"
+                    onClick={() => togglePlatform(platform.value)}
+                    disabled={pending}
+                    className={`rounded-full border px-3 py-1.5 text-xs font-medium transition disabled:opacity-60 ${
+                      selected
+                        ? "border-primary bg-primary/10 text-primary"
+                        : "border-border bg-background text-muted-foreground hover:bg-muted"
+                    }`}
+                  >
+                    {platform.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={pending}
+              className="rounded-md border border-border px-4 py-2 text-sm font-medium text-muted-foreground transition hover:bg-muted disabled:opacity-60"
+            >
+              キャンセル
+            </button>
+            <button
+              type="submit"
+              disabled={!canSubmit}
+              className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {pending ? "追加中..." : "追加する"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}

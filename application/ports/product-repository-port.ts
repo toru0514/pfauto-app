@@ -1,6 +1,14 @@
 import type { JobStatus, ProductStatus } from "@/application/types/status";
 import type { SpreadsheetProductRecord } from "@/application/types/product";
 
+export type AddProductInput = {
+  productId: string;
+  title: string;
+  price: number | null;
+  inventory: number | null;
+  platforms: string[];
+};
+
 export type UpdateProductStatusInput = {
   productId: string;
   syncStatus?: ProductStatus;
@@ -14,4 +22,5 @@ export interface ProductRepositoryPort {
   listProducts(): Promise<SpreadsheetProductRecord[]>;
   findProductById(productId: string): Promise<SpreadsheetProductRecord | null>;
   updateProductStatuses(input: UpdateProductStatusInput): Promise<void>;
+  addProduct(input: AddProductInput): Promise<void>;
 }

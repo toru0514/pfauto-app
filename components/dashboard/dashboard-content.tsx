@@ -3,11 +3,13 @@
 import { useCallback, useMemo, useState, useTransition } from "react";
 import { ExternalLink } from "lucide-react";
 import {
+  addProduct,
   enqueueDraft,
   refreshProductsFromSheets,
   ProductRow,
   JobRow,
 } from "@/app/dashboard/actions";
+import { AddProductModal, type AddProductFormData } from "./add-product-modal";
 import { useToast } from "@/components/providers/toast-provider";
 
 type Props = {
@@ -22,7 +24,7 @@ type DetailProduct = ProductRow & {
 
 type OperationLogEntry = {
   id: string;
-  type: "sync" | "enqueue";
+  type: "sync" | "enqueue" | "add";
   status: "success" | "error";
   message: string;
   detail?: string;
@@ -32,7 +34,9 @@ type OperationLogEntry = {
 export function DashboardContent({ products, jobs, spreadsheetUrl }: Props) {
   const [pendingRefresh, startRefresh] = useTransition();
   const [pendingEnqueue, startEnqueue] = useTransition();
+  const [pendingAddProduct, startAddProduct] = useTransition();
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
+  const [showAddProductModal, setShowAddProductModal] = useState(false);
   const [operationLogs, setOperationLogs] = useState<OperationLogEntry[]>([]);
   const { showToast } = useToast();
 
@@ -84,6 +88,38 @@ export function DashboardContent({ products, jobs, spreadsheetUrl }: Props) {
     });
   };
 
+  const handleAddProduct = (data: AddProductFormData) => {
+    startAddProduct(async () => {
+      try {
+        await addProduct(data);
+        setShowAddProductModal(false);
+        showToast({
+          title: "商品を追加しました",
+          description: `${data.title} (${renderPlatformsForToast(data.platforms)})`,
+          variant: "success",
+        });
+        appendLog({
+          type: "add",
+          status: "success",
+          message: `${data.title} を追加しました。`,
+        });
+      } catch (error) {
+        const message = extractErrorMessage(error);
+        showToast({
+          title: "商品の追加に失敗しました",
+          description: message,
+          variant: "error",
+        });
+        appendLog({
+          type: "add",
+          status: "error",
+          message: "商品の追加に失敗しました。",
+          detail: message,
+        });
+      }
+    });
+  };
+
   const selectedProduct: DetailProduct | null = useMemo(() => {
     if (!selectedProductId) return null;
     const product = products.find((item) => item.id === selectedProductId);
@@ -116,6 +152,13 @@ export function DashboardContent({ products, jobs, spreadsheetUrl }: Props) {
               スプレッドシートを開く
             </a>
           )}
+          <button
+            type="button"
+            onClick={() => setShowAddProductModal(true)}
+            className="rounded-md border border-border bg-background px-3 py-2 text-sm font-semibold text-foreground transition hover:bg-muted"
+          >
+            商品を追加
+          </button>
           <button
             type="button"
             onClick={handleRefresh}
@@ -258,6 +301,14 @@ export function DashboardContent({ products, jobs, spreadsheetUrl }: Props) {
           onClose={() => setSelectedProductId(null)}
         />
       ) : null}
+
+      {showAddProductModal && (
+        <AddProductModal
+          pending={pendingAddProduct}
+          onSubmit={handleAddProduct}
+          onClose={() => setShowAddProductModal(false)}
+        />
+      )}
 
       <OperationLogSection logs={operationLogs} />
     </div>
@@ -508,5 +559,6 @@ function OperationLogSection({ logs }: { logs: OperationLogEntry[] }) {
 function renderOperationLabel(type: OperationLogEntry["type"]) {
   if (type === "sync") return "シート同期";
   if (type === "enqueue") return "送信キュー登録";
+  if (type === "add") return "商品追加";
   return type;
 }

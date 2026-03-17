@@ -5,6 +5,7 @@ import {
   getDashboardSnapshotUseCase,
   refreshProductsFromSheetsUseCase,
   enqueueDraftUseCase,
+  addProductUseCase,
   type DashboardJob,
   type DashboardProduct,
 } from "@/application/usecases/dashboard";
@@ -24,6 +25,18 @@ export async function refreshProductsFromSheets() {
 
 export async function enqueueDraft(productId: string, platforms: string[]) {
   await enqueueDraftUseCase(productId, platforms);
+  revalidatePath("/dashboard");
+  revalidatePath("/");
+}
+
+export async function addProduct(input: {
+  productId: string;
+  title: string;
+  price: number | null;
+  inventory: number | null;
+  platforms: string[];
+}) {
+  await addProductUseCase(input);
   revalidatePath("/dashboard");
   revalidatePath("/");
 }
