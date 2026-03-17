@@ -1,5 +1,6 @@
 import { google, sheets_v4 } from "googleapis";
 import type {
+  AddProductInput,
   ProductRepositoryPort,
   UpdateProductStatusInput,
 } from "@/application/ports/product-repository-port";
@@ -370,6 +371,66 @@ export class GoogleSheetsProductRepository implements ProductRepositoryPort {
   ): Promise<SpreadsheetProductRecord | null> {
     const products = await this.listProducts();
     return products.find((product) => product.id === productId) ?? null;
+  }
+
+  async addProduct(input: AddProductInput): Promise<void> {
+    if (shouldUseMockSheetData()) {
+      log.warn("USE_MOCK_SHEETS_DATA=true のため addProduct をスキップしました", {
+        productId: input.productId,
+      });
+      return;
+    }
+
+    try {
+      const matrix = await this.fetchSheetMatrix();
+      if (!matrix) {
+        throw new Error("スプレッドシートのヘッダー行を取得できませんでした。");
+      }
+      const { headerRow } = matrix;
+
+      const newRow: string[] = new Array(headerRow.length).fill("");
+
+      const fieldMapping: { aliases: string[]; value: string }[] = [
+        { aliases: HEADER_ALIASES.productId, value: input.productId },
+        { aliases: HEADER_ALIASES.title, value: input.title },
+        { aliases: HEADER_ALIASES.price, value: input.price !== null ? String(input.price) : "" },
+        { aliases: HEADER_ALIASES.inventory, value: input.inventory !== null ? String(input.inventory) : "" },
+        { aliases: HEADER_ALIASES.platforms, value: input.platforms.join(",") },
+        { aliases: HEADER_ALIASES.syncStatus, value: "new" },
+      ];
+
+      for (const { aliases, value } of fieldMapping) {
+        const index = findColumnIndex(headerRow, aliases);
+        if (index !== null) {
+          newRow[index] = value;
+        }
+      }
+
+      await rateLimiter.acquire();
+
+      const sheets = getSheetsClient();
+      const sheetTitle = getSheetTitle();
+
+      await sheets.spreadsheets.values.append({
+        spreadsheetId: getSpreadsheetId(),
+        range: `${sheetTitle}!A1`,
+        valueInputOption: "RAW",
+        insertDataOption: "INSERT_ROWS",
+        requestBody: {
+          values: [newRow],
+        },
+      });
+
+      log.info("スプレッドシートに商品を追加しました", {
+        productId: input.productId,
+        title: input.title,
+      });
+    } catch (error) {
+      log.error("スプレッドシートへの商品追加に失敗しました", error, {
+        productId: input.productId,
+      });
+      throw error;
+    }
   }
 
   async updateProductStatuses(input: UpdateProductStatusInput): Promise<void> {
