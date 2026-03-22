@@ -192,7 +192,6 @@ export function DashboardContent({ products, jobs, spreadsheetUrl }: Props) {
                 >
                   <td className="px-4 py-3">
                     <div className="font-medium text-foreground">{product.title}</div>
-                    <div className="text-xs text-muted-foreground">ID: {product.id}</div>
                   </td>
                   <td className="px-4 py-3">
                     <PlatformBadges values={product.platforms} />
@@ -289,26 +288,30 @@ export function DashboardContent({ products, jobs, spreadsheetUrl }: Props) {
         />
       )}
 
-      {copyingProductId && (
-        <CopyProductDialog
-          sourceProductId={copyingProductId}
-          onClose={() => setCopyingProductId(null)}
-          onCopied={(newId) => {
-            setCopyingProductId(null);
-            showToast({
-              title: "商品をコピーしました",
-              description: `${newId} を作成しました。`,
-              variant: "success",
-            });
-            appendLog({
-              type: "add",
-              status: "success",
-              message: `${copyingProductId} → ${newId} にコピーしました。`,
-            });
-            router.push(`/dashboard/products/${encodeURIComponent(newId)}`);
-          }}
-        />
-      )}
+      {copyingProductId && (() => {
+        const copyingProduct = products.find((p) => p.id === copyingProductId);
+        return (
+          <CopyProductDialog
+            sourceProductId={copyingProductId}
+            sourceProductTitle={copyingProduct?.title ?? copyingProductId}
+            onClose={() => setCopyingProductId(null)}
+            onCopied={(newId) => {
+              setCopyingProductId(null);
+              showToast({
+                title: "商品をコピーしました",
+                description: `${copyingProduct?.title ?? newId} のコピーを作成しました。`,
+                variant: "success",
+              });
+              appendLog({
+                type: "add",
+                status: "success",
+                message: `${copyingProduct?.title ?? copyingProductId} をコピーしました。`,
+              });
+              router.push(`/dashboard/products/${encodeURIComponent(newId)}`);
+            }}
+          />
+        );
+      })()}
 
       <OperationLogSection logs={operationLogs} />
     </div>
@@ -401,7 +404,6 @@ function DetailSheet({ product, onClose }: { product: DetailProduct; onClose: ()
         <div className="flex items-center justify-between border-b border-border bg-muted/50 px-4 py-3">
           <div>
             <h2 className="text-lg font-semibold text-foreground">{product.title}</h2>
-            <p className="text-sm text-muted-foreground">ID: {product.id}</p>
           </div>
           <button
             onClick={onClose}

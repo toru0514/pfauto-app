@@ -121,7 +121,6 @@ export function ProductEditForm({ productId }: Props) {
           </button>
           <div>
             <h1 className="text-2xl font-semibold text-foreground">商品編集</h1>
-            <p className="text-sm text-muted-foreground">ID: {productId}</p>
           </div>
         </div>
         <button
@@ -257,7 +256,6 @@ function FieldInput({
   options?: string[];
   onPickImages?: () => void;
 }) {
-  const isReadOnly = field.key === "product_id";
   const isWide = field.type === "textarea";
 
   const wrapperClass = isWide ? "col-span-full" : "";
@@ -286,9 +284,9 @@ function FieldInput({
           onChange={(e) => onChange(e.target.value)}
           placeholder={field.placeholder}
           disabled={disabled}
-          readOnly={isReadOnly}
+
           rows={field.key === "description" ? 12 : 4}
-          className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 disabled:opacity-60 read-only:bg-muted/50 resize-y"
+          className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 disabled:opacity-60 resize-y"
         />
         {field.key === "image_urls" && value && (
           <div className="mt-2 flex flex-wrap gap-2">
@@ -391,8 +389,7 @@ function FieldInput({
         onChange={(e) => onChange(e.target.value)}
         placeholder={field.placeholder}
         disabled={disabled}
-        readOnly={isReadOnly}
-        className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 disabled:opacity-60 read-only:bg-muted/50"
+        className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 disabled:opacity-60"
       />
     </div>
   );

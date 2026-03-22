@@ -5,30 +5,21 @@ import { copyProduct } from "@/app/dashboard/actions";
 
 type Props = {
   sourceProductId: string;
+  sourceProductTitle: string;
   onClose: () => void;
   onCopied: (newProductId: string) => void;
 };
 
-export function CopyProductDialog({ sourceProductId, onClose, onCopied }: Props) {
-  const [newProductId, setNewProductId] = useState("");
+export function CopyProductDialog({ sourceProductId, sourceProductTitle, onClose, onCopied }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
-  const generateId = () => {
-    setNewProductId(`prod-${Date.now()}`);
-  };
-
-  const canSubmit = !pending && newProductId.trim().length > 0;
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!canSubmit) return;
-
+  const handleCopy = () => {
     setError(null);
     startTransition(async () => {
       try {
-        await copyProduct(sourceProductId, newProductId.trim());
-        onCopied(newProductId.trim());
+        const newId = await copyProduct(sourceProductId);
+        onCopied(newId);
       } catch (err) {
         setError(err instanceof Error ? err.message : "コピーに失敗しました");
       }
@@ -55,35 +46,11 @@ export function CopyProductDialog({ sourceProductId, onClose, onCopied }: Props)
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4 px-4 py-4">
+        <div className="space-y-4 px-4 py-4">
           <p className="text-sm text-muted-foreground">
-            <span className="font-medium text-foreground">{sourceProductId}</span>{" "}
-            のすべてのフィールドをコピーして新しい商品を作成します。
+            <span className="font-medium text-foreground">{sourceProductTitle}</span>{" "}
+            をコピーしますか？
           </p>
-
-          <div>
-            <label className="block text-xs font-medium text-muted-foreground mb-1">
-              新しい商品ID <span className="text-destructive">*</span>
-            </label>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={newProductId}
-                onChange={(e) => setNewProductId(e.target.value)}
-                placeholder="例: ring-002"
-                disabled={pending}
-                className="flex-1 rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 disabled:opacity-60"
-              />
-              <button
-                type="button"
-                onClick={generateId}
-                disabled={pending}
-                className="shrink-0 rounded-md border border-border bg-muted px-3 py-2 text-xs font-medium text-muted-foreground transition hover:bg-muted/80 disabled:opacity-60"
-              >
-                自動生成
-              </button>
-            </div>
-          </div>
 
           {error && (
             <div className="rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive">
@@ -101,14 +68,15 @@ export function CopyProductDialog({ sourceProductId, onClose, onCopied }: Props)
               キャンセル
             </button>
             <button
-              type="submit"
-              disabled={!canSubmit}
+              type="button"
+              onClick={handleCopy}
+              disabled={pending}
               className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {pending ? "コピー中..." : "コピーする"}
             </button>
           </div>
-        </form>
+        </div>
       </div>
     </div>
   );

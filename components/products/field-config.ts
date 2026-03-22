@@ -21,8 +21,6 @@ export const SECTION_LABELS: Record<FieldSection, string> = {
 // 共通シートのカラム順に合わせた定義
 export const FIELD_CONFIGS: FieldConfig[] = [
   // === 基本情報 ===
-  { key: "product_id", label: "商品ID", type: "text", section: "basic" },
-  { key: "sku", label: "SKU", type: "text", section: "basic" },
   { key: "title", label: "商品名", type: "text", section: "basic" },
   { key: "description", label: "商品説明", type: "textarea", section: "basic" },
   { key: "price", label: "価格", type: "number", section: "basic", placeholder: "例: 3500" },

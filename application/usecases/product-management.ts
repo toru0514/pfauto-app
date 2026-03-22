@@ -28,22 +28,14 @@ export async function updateProductUseCase(
 }
 
 export async function copyProductUseCase(
-  sourceProductId: string,
-  newProductId: string
-): Promise<void> {
-  if (!newProductId.trim()) {
-    throw new Error("新しい商品IDは必須です。");
-  }
-
+  sourceProductId: string
+): Promise<string> {
   const source = await googleSheetsProductRepository.findProductById(sourceProductId);
   if (!source) {
     throw new Error(`コピー元の商品 ${sourceProductId} が見つかりませんでした。`);
   }
 
-  const existing = await googleSheetsProductRepository.findProductById(newProductId.trim());
-  if (existing) {
-    throw new Error(`商品ID "${newProductId}" は既に存在します。`);
-  }
+  const newProductId = `prod-${Date.now()}`;
 
   // Copy raw data, override ID and reset statuses
   const newFields = { ...source.raw };
@@ -54,7 +46,7 @@ export async function copyProductUseCase(
     return lower === "product_id" || lower === "id" || lower === "商品id";
   });
   for (const key of productIdKeys) {
-    newFields[key] = newProductId.trim();
+    newFields[key] = newProductId;
   }
 
   // Reset status fields
@@ -105,4 +97,5 @@ export async function copyProductUseCase(
   }
 
   await googleSheetsProductRepository.addProductRaw(newFields);
+  return newProductId;
 }

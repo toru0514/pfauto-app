@@ -94,16 +94,16 @@ export async function updateProduct(input: {
 }
 
 export async function copyProduct(
-  sourceProductId: string,
-  newProductId: string
-): Promise<void> {
-  if (typeof sourceProductId !== "string" || typeof newProductId !== "string") {
+  sourceProductId: string
+): Promise<string> {
+  if (typeof sourceProductId !== "string") {
     throw new Error("不正な入力です。");
   }
 
-  await copyProductUseCase(sourceProductId, newProductId);
+  const newId = await copyProductUseCase(sourceProductId);
   revalidatePath("/dashboard");
   revalidatePath("/");
+  return newId;
 }
 
 /**
