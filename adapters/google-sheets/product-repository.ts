@@ -469,7 +469,10 @@ export class GoogleSheetsProductRepository implements ProductRepositoryPort {
 
       for (const [key, value] of Object.entries(input.fields)) {
         const colIndex = headerRow.indexOf(key);
-        if (colIndex === -1) continue;
+        if (colIndex === -1) {
+          console.warn(`[updateProduct] ヘッダーに列 "${key}" が見つかりません。スキップします。`);
+          continue;
+        }
         updates.push({
           range: `${sheetTitle}!${columnIndexToLetter(colIndex)}${targetRowNumber}`,
           values: [[value]],

@@ -292,7 +292,7 @@ function FieldInput({
           <div className="mt-2 flex flex-wrap gap-2">
             {value.split(",").map((url) => url.trim()).filter(Boolean).map((url, i) => (
               <img
-                key={i}
+                key={url}
                 src={`${url}?w=80&h=80&fit=crop`}
                 alt=""
                 className="h-16 w-16 rounded-md border border-border object-cover"

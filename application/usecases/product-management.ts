@@ -35,7 +35,7 @@ export async function copyProductUseCase(
     throw new Error(`コピー元の商品 ${sourceProductId} が見つかりませんでした。`);
   }
 
-  const newProductId = `prod-${Date.now()}`;
+  const newProductId = `prod-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
 
   // Copy raw data, override ID and reset statuses
   const newFields = { ...source.raw };

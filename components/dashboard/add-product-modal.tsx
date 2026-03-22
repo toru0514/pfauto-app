@@ -25,7 +25,7 @@ type Props = {
 };
 
 export function AddProductModal({ pending, onSubmit, onClose }: Props) {
-  const [productId] = useState(() => `prod-${Date.now()}`);
+  const [productId] = useState(() => `prod-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [priceText, setPriceText] = useState("");
