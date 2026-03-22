@@ -2,6 +2,7 @@ import { google, sheets_v4 } from "googleapis";
 import type {
   AddProductInput,
   ProductRepositoryPort,
+  UpdateProductInput,
   UpdateProductStatusInput,
 } from "@/application/ports/product-repository-port";
 import type {
@@ -430,6 +431,118 @@ export class GoogleSheetsProductRepository implements ProductRepositoryPort {
       log.error("スプレッドシートへの商品追加に失敗しました", error, {
         productId: input.productId,
       });
+      throw error;
+    }
+  }
+
+  async updateProduct(input: UpdateProductInput): Promise<void> {
+    if (shouldUseMockSheetData()) {
+      log.warn("USE_MOCK_SHEETS_DATA=true のため updateProduct をスキップしました", {
+        productId: input.productId,
+      });
+      return;
+    }
+
+    try {
+      const matrix = await this.fetchSheetMatrix();
+      if (!matrix) return;
+      const { headerRow, rows } = matrix;
+
+      const productIdIndex = findColumnIndex(headerRow, HEADER_ALIASES.productId);
+      if (productIdIndex === null) {
+        throw new Error("product_id 列が見つかりませんでした。");
+      }
+
+      let targetRowNumber: number | null = null;
+      rows.forEach((row, rowIndex) => {
+        if (row[productIdIndex] === input.productId) {
+          targetRowNumber = rowIndex + 2;
+        }
+      });
+
+      if (!targetRowNumber) {
+        throw new Error(`product_id=${input.productId} の行が見つかりませんでした。`);
+      }
+
+      const updates: sheets_v4.Schema$ValueRange[] = [];
+      const sheetTitle = getSheetTitle();
+
+      for (const [key, value] of Object.entries(input.fields)) {
+        const colIndex = headerRow.indexOf(key);
+        if (colIndex === -1) continue;
+        updates.push({
+          range: `${sheetTitle}!${columnIndexToLetter(colIndex)}${targetRowNumber}`,
+          values: [[value]],
+        });
+      }
+
+      if (!updates.length) return;
+
+      await rateLimiter.acquire();
+
+      const sheets = getSheetsClient();
+      await sheets.spreadsheets.values.batchUpdate({
+        spreadsheetId: getSpreadsheetId(),
+        requestBody: {
+          valueInputOption: "RAW",
+          data: updates,
+        },
+      });
+
+      log.info("スプレッドシート商品更新完了", {
+        productId: input.productId,
+        updatedFields: updates.length,
+      });
+    } catch (error) {
+      log.error("スプレッドシート商品更新失敗", error, {
+        productId: input.productId,
+      });
+      throw error;
+    }
+  }
+
+  async addProductRaw(fields: Record<string, string>): Promise<void> {
+    if (shouldUseMockSheetData()) {
+      log.warn("USE_MOCK_SHEETS_DATA=true のため addProductRaw をスキップしました");
+      return;
+    }
+
+    try {
+      const matrix = await this.fetchSheetMatrix();
+      if (!matrix) {
+        throw new Error("スプレッドシートのヘッダー行を取得できませんでした。");
+      }
+      const { headerRow } = matrix;
+
+      const newRow: string[] = new Array(headerRow.length).fill("");
+
+      for (const [key, value] of Object.entries(fields)) {
+        const colIndex = headerRow.indexOf(key);
+        if (colIndex !== -1) {
+          newRow[colIndex] = value;
+        }
+      }
+
+      await rateLimiter.acquire();
+
+      const sheets = getSheetsClient();
+      const sheetTitle = getSheetTitle();
+
+      await sheets.spreadsheets.values.append({
+        spreadsheetId: getSpreadsheetId(),
+        range: `${sheetTitle}!A1`,
+        valueInputOption: "RAW",
+        insertDataOption: "INSERT_ROWS",
+        requestBody: {
+          values: [newRow],
+        },
+      });
+
+      log.info("スプレッドシートにraw商品を追加しました", {
+        fieldCount: Object.keys(fields).length,
+      });
+    } catch (error) {
+      log.error("スプレッドシートへのraw商品追加に失敗しました", error);
       throw error;
     }
   }

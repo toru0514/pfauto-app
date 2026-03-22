@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useState, useTransition } from "react";
-import { ExternalLink } from "lucide-react";
+import { ExternalLink, Copy } from "lucide-react";
 import {
   addProduct,
   enqueueDraft,
@@ -10,6 +10,8 @@ import {
   JobRow,
 } from "@/app/dashboard/actions";
 import { AddProductModal, type AddProductFormData } from "./add-product-modal";
+import { ProductEditPanel } from "@/components/products/product-edit-panel";
+import { CopyProductDialog } from "@/components/products/copy-product-dialog";
 import { useToast } from "@/components/providers/toast-provider";
 
 type Props = {
@@ -36,6 +38,8 @@ export function DashboardContent({ products, jobs, spreadsheetUrl }: Props) {
   const [pendingEnqueue, startEnqueue] = useTransition();
   const [pendingAddProduct, startAddProduct] = useTransition();
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
+  const [editingProductId, setEditingProductId] = useState<string | null>(null);
+  const [copyingProductId, setCopyingProductId] = useState<string | null>(null);
   const [showAddProductModal, setShowAddProductModal] = useState(false);
   const [operationLogs, setOperationLogs] = useState<OperationLogEntry[]>([]);
   const { showToast } = useToast();
@@ -188,7 +192,11 @@ export function DashboardContent({ products, jobs, spreadsheetUrl }: Props) {
             </thead>
             <tbody className="divide-y divide-border">
               {products.map((product) => (
-                <tr key={product.id} className="bg-card">
+                <tr
+                  key={product.id}
+                  className="bg-card cursor-pointer transition hover:bg-muted/30"
+                  onClick={() => setEditingProductId(product.id)}
+                >
                   <td className="px-4 py-3">
                     <div className="font-medium text-foreground">{product.title}</div>
                     <div className="text-xs text-muted-foreground">ID: {product.id}</div>
@@ -206,7 +214,14 @@ export function DashboardContent({ products, jobs, spreadsheetUrl }: Props) {
                     {product.lastError ?? "-"}
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <div className="flex items-center justify-end gap-2">
+                    <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        className="rounded-md border border-border px-3 py-2 text-xs font-medium text-foreground transition hover:bg-muted"
+                        onClick={() => setCopyingProductId(product.id)}
+                        title="コピー"
+                      >
+                        <Copy className="h-3.5 w-3.5" />
+                      </button>
                       <button
                         className="rounded-md border border-border px-3 py-2 text-xs font-medium text-foreground transition hover:bg-muted"
                         onClick={() => setSelectedProductId(product.id)}
@@ -307,6 +322,48 @@ export function DashboardContent({ products, jobs, spreadsheetUrl }: Props) {
           pending={pendingAddProduct}
           onSubmit={handleAddProduct}
           onClose={() => setShowAddProductModal(false)}
+        />
+      )}
+
+      {editingProductId && (
+        <ProductEditPanel
+          productId={editingProductId}
+          onClose={() => setEditingProductId(null)}
+          onSaved={() => {
+            showToast({
+              title: "商品を更新しました",
+              description: `${editingProductId} の変更を保存しました。`,
+              variant: "success",
+            });
+            appendLog({
+              type: "add",
+              status: "success",
+              message: `${editingProductId} を更新しました。`,
+            });
+            setEditingProductId(null);
+          }}
+        />
+      )}
+
+      {copyingProductId && (
+        <CopyProductDialog
+          sourceProductId={copyingProductId}
+          onClose={() => setCopyingProductId(null)}
+          onCopied={(newId) => {
+            setCopyingProductId(null);
+            showToast({
+              title: "商品をコピーしました",
+              description: `${newId} を作成しました。`,
+              variant: "success",
+            });
+            appendLog({
+              type: "add",
+              status: "success",
+              message: `${copyingProductId} → ${newId} にコピーしました。`,
+            });
+            // Open the new product in edit panel
+            setEditingProductId(newId);
+          }}
         />
       )}
 

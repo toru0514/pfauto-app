@@ -19,9 +19,16 @@ export type UpdateProductStatusInput = {
   note?: string | null;
 };
 
+export type UpdateProductInput = {
+  productId: string;
+  fields: Record<string, string>; // カラムヘッダー名 → 値
+};
+
 export interface ProductRepositoryPort {
   listProducts(): Promise<SpreadsheetProductRecord[]>;
   findProductById(productId: string): Promise<SpreadsheetProductRecord | null>;
   updateProductStatuses(input: UpdateProductStatusInput): Promise<void>;
   addProduct(input: AddProductInput): Promise<void>;
+  updateProduct(input: UpdateProductInput): Promise<void>;
+  addProductRaw(fields: Record<string, string>): Promise<void>;
 }

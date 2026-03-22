@@ -9,6 +9,12 @@ import {
   type DashboardJob,
   type DashboardProduct,
 } from "@/application/usecases/dashboard";
+import {
+  getProductDetailUseCase,
+  updateProductUseCase,
+  copyProductUseCase,
+} from "@/application/usecases/product-management";
+import type { SpreadsheetProductRecord } from "@/application/types/product";
 
 export type ProductRow = DashboardProduct;
 export type JobRow = DashboardJob;
@@ -56,6 +62,46 @@ export async function addProduct(input: unknown) {
     inventory,
     platforms: raw.platforms as string[],
   });
+  revalidatePath("/dashboard");
+  revalidatePath("/");
+}
+
+export type ProductDetail = SpreadsheetProductRecord;
+
+export async function getProductDetail(
+  productId: string
+): Promise<ProductDetail> {
+  return getProductDetailUseCase(productId);
+}
+
+export async function updateProduct(input: {
+  productId: string;
+  fields: Record<string, string>;
+}): Promise<void> {
+  if (
+    typeof input !== "object" ||
+    !input ||
+    typeof input.productId !== "string" ||
+    typeof input.fields !== "object" ||
+    !input.fields
+  ) {
+    throw new Error("不正な入力です。");
+  }
+
+  await updateProductUseCase(input.productId, input.fields);
+  revalidatePath("/dashboard");
+  revalidatePath("/");
+}
+
+export async function copyProduct(
+  sourceProductId: string,
+  newProductId: string
+): Promise<void> {
+  if (typeof sourceProductId !== "string" || typeof newProductId !== "string") {
+    throw new Error("不正な入力です。");
+  }
+
+  await copyProductUseCase(sourceProductId, newProductId);
   revalidatePath("/dashboard");
   revalidatePath("/");
 }
