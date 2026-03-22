@@ -9,6 +9,12 @@ import {
   type DashboardJob,
   type DashboardProduct,
 } from "@/application/usecases/dashboard";
+import {
+  getProductDetailUseCase,
+  updateProductUseCase,
+  copyProductUseCase,
+} from "@/application/usecases/product-management";
+import type { SpreadsheetProductRecord } from "@/application/types/product";
 
 export type ProductRow = DashboardProduct;
 export type JobRow = DashboardJob;
@@ -58,6 +64,106 @@ export async function addProduct(input: unknown) {
   });
   revalidatePath("/dashboard");
   revalidatePath("/");
+}
+
+export type ProductDetail = SpreadsheetProductRecord;
+
+export async function getProductDetail(
+  productId: string
+): Promise<ProductDetail> {
+  return getProductDetailUseCase(productId);
+}
+
+export async function updateProduct(input: {
+  productId: string;
+  fields: Record<string, string>;
+}): Promise<void> {
+  if (
+    typeof input !== "object" ||
+    !input ||
+    typeof input.productId !== "string" ||
+    typeof input.fields !== "object" ||
+    !input.fields
+  ) {
+    throw new Error("不正な入力です。");
+  }
+
+  await updateProductUseCase(input.productId, input.fields);
+  revalidatePath("/dashboard");
+  revalidatePath("/");
+}
+
+export async function copyProduct(
+  sourceProductId: string
+): Promise<string> {
+  if (typeof sourceProductId !== "string") {
+    throw new Error("不正な入力です。");
+  }
+
+  const newId = await copyProductUseCase(sourceProductId);
+  revalidatePath("/dashboard");
+  revalidatePath("/");
+  return newId;
+}
+
+/**
+ * selectフィールドの選択肢を共通シートの既存データから取得する。
+ * キー: カラム名, 値: ユニーク値の配列
+ */
+export async function getFieldOptions(
+  keys: string[]
+): Promise<Record<string, string[]>> {
+  const { googleSheetsProductRepository } = await import(
+    "@/adapters/google-sheets/product-repository"
+  );
+  const products = await googleSheetsProductRepository.listProducts();
+
+  const result: Record<string, string[]> = {};
+  for (const key of keys) {
+    const values = new Set<string>();
+    for (const product of products) {
+      const v = (product.raw[key] ?? "").trim();
+      if (v) values.add(v);
+    }
+    result[key] = [...values].sort();
+  }
+  return result;
+}
+
+export type MicroCmsImage = {
+  id: string;
+  url: string;
+  width: number;
+  height: number;
+};
+
+export async function fetchMicroCmsImages(
+  offset: number = 0,
+  limit: number = 20
+): Promise<{ images: MicroCmsImage[]; totalCount: number }> {
+  const domain = process.env.MICROCMS_SERVICE_DOMAIN;
+  const apiKey = process.env.MICROCMS_API_KEY;
+  if (!domain || !apiKey) {
+    throw new Error("microCMSの環境変数が設定されていません。");
+  }
+
+  const res = await fetch(
+    `https://${domain}.microcms-management.io/api/v1/media?limit=${limit}&offset=${offset}`,
+    { headers: { "X-MICROCMS-API-KEY": apiKey }, cache: "no-store" }
+  );
+  if (!res.ok) {
+    throw new Error(`microCMS API エラー: ${res.status}`);
+  }
+  const data = await res.json();
+  return {
+    images: (data.media ?? []).map((m: Record<string, unknown>) => ({
+      id: m.id as string,
+      url: m.url as string,
+      width: m.width as number,
+      height: m.height as number,
+    })),
+    totalCount: data.totalCount as number,
+  };
 }
 
 export async function getSpreadsheetUrl(): Promise<string | null> {

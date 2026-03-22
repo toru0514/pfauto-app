@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useMemo, useState, useTransition } from "react";
-import { ExternalLink } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Copy, Pencil } from "lucide-react";
 import {
   addProduct,
   enqueueDraft,
@@ -10,12 +11,17 @@ import {
   JobRow,
 } from "@/app/dashboard/actions";
 import { AddProductModal, type AddProductFormData } from "./add-product-modal";
+import { CopyProductDialog } from "@/components/products/copy-product-dialog";
 import { useToast } from "@/components/providers/toast-provider";
 
 type Props = {
   products: ProductRow[];
   jobs: JobRow[];
   spreadsheetUrl: string | null;
+};
+
+export type JobsContentProps = {
+  jobs: JobRow[];
 };
 
 type DetailProduct = ProductRow & {
@@ -32,10 +38,12 @@ type OperationLogEntry = {
 };
 
 export function DashboardContent({ products, jobs, spreadsheetUrl }: Props) {
+  const router = useRouter();
   const [pendingRefresh, startRefresh] = useTransition();
   const [pendingEnqueue, startEnqueue] = useTransition();
   const [pendingAddProduct, startAddProduct] = useTransition();
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
+  const [copyingProductId, setCopyingProductId] = useState<string | null>(null);
   const [showAddProductModal, setShowAddProductModal] = useState(false);
   const [operationLogs, setOperationLogs] = useState<OperationLogEntry[]>([]);
   const { showToast } = useToast();
@@ -141,17 +149,6 @@ export function DashboardContent({ products, jobs, spreadsheetUrl }: Props) {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {spreadsheetUrl && (
-            <a
-              href={spreadsheetUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-3 py-2 text-sm font-semibold text-foreground transition hover:bg-muted"
-            >
-              <ExternalLink className="h-4 w-4" />
-              スプレッドシートを開く
-            </a>
-          )}
           <button
             type="button"
             onClick={() => setShowAddProductModal(true)}
@@ -188,10 +185,13 @@ export function DashboardContent({ products, jobs, spreadsheetUrl }: Props) {
             </thead>
             <tbody className="divide-y divide-border">
               {products.map((product) => (
-                <tr key={product.id} className="bg-card">
+                <tr
+                  key={product.id}
+                  className="bg-card cursor-pointer transition hover:bg-muted/30"
+                  onClick={() => router.push(`/dashboard/products/${encodeURIComponent(product.id)}`)}
+                >
                   <td className="px-4 py-3">
                     <div className="font-medium text-foreground">{product.title}</div>
-                    <div className="text-xs text-muted-foreground">ID: {product.id}</div>
                   </td>
                   <td className="px-4 py-3">
                     <PlatformBadges values={product.platforms} />
@@ -206,7 +206,21 @@ export function DashboardContent({ products, jobs, spreadsheetUrl }: Props) {
                     {product.lastError ?? "-"}
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <div className="flex items-center justify-end gap-2">
+                    <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        className="rounded-md border border-border px-3 py-2 text-xs font-medium text-foreground transition hover:bg-muted"
+                        onClick={() => router.push(`/dashboard/products/${encodeURIComponent(product.id)}`)}
+                        title="編集"
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        className="rounded-md border border-border px-3 py-2 text-xs font-medium text-foreground transition hover:bg-muted"
+                        onClick={() => setCopyingProductId(product.id)}
+                        title="コピー"
+                      >
+                        <Copy className="h-3.5 w-3.5" />
+                      </button>
                       <button
                         className="rounded-md border border-border px-3 py-2 text-xs font-medium text-foreground transition hover:bg-muted"
                         onClick={() => setSelectedProductId(product.id)}
@@ -259,42 +273,6 @@ export function DashboardContent({ products, jobs, spreadsheetUrl }: Props) {
         </div>
       </section>
 
-      <section className="overflow-hidden rounded-lg border border-border bg-card shadow-sm">
-        <div className="border-b border-border bg-muted/50 px-4 py-2 text-sm font-semibold text-muted-foreground">
-          ジョブステータス
-        </div>
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-border text-sm">
-            <thead className="bg-muted/30 text-muted-foreground">
-              <tr>
-                <th className="px-4 py-3 text-left font-medium">ジョブID</th>
-                <th className="px-4 py-3 text-left font-medium">商品</th>
-                <th className="px-4 py-3 text-left font-medium">プラットフォーム</th>
-                <th className="px-4 py-3 text-left font-medium">ステータス</th>
-                <th className="px-4 py-3 text-left font-medium">試行</th>
-                <th className="px-4 py-3 text-left font-medium">開始時刻</th>
-                <th className="px-4 py-3 text-left font-medium">所要時間</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {jobs.map((job) => (
-                <tr key={job.id} className="bg-card">
-                  <td className="px-4 py-3 font-medium text-foreground">{job.id}</td>
-                  <td className="px-4 py-3 text-sm text-muted-foreground">{job.productId}</td>
-                  <td className="px-4 py-3"><PlatformBadges values={[job.platform]} /></td>
-                  <td className="px-4 py-3"><JobStatusBadge status={job.status} /></td>
-                  <td className="px-4 py-3 text-sm text-muted-foreground">{job.attempt ?? "-"}</td>
-                  <td className="px-4 py-3 text-sm text-muted-foreground">{formatDate(job.startedAt)}</td>
-                  <td className="px-4 py-3 text-sm text-muted-foreground">
-                    {job.durationSeconds ? `${job.durationSeconds}s` : "-"}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
-
       {selectedProduct ? (
         <DetailSheet
           product={selectedProduct}
@@ -309,6 +287,31 @@ export function DashboardContent({ products, jobs, spreadsheetUrl }: Props) {
           onClose={() => setShowAddProductModal(false)}
         />
       )}
+
+      {copyingProductId && (() => {
+        const copyingProduct = products.find((p) => p.id === copyingProductId);
+        return (
+          <CopyProductDialog
+            sourceProductId={copyingProductId}
+            sourceProductTitle={copyingProduct?.title ?? copyingProductId}
+            onClose={() => setCopyingProductId(null)}
+            onCopied={(newId) => {
+              setCopyingProductId(null);
+              showToast({
+                title: "商品をコピーしました",
+                description: `${copyingProduct?.title ?? newId} のコピーを作成しました。`,
+                variant: "success",
+              });
+              appendLog({
+                type: "add",
+                status: "success",
+                message: `${copyingProduct?.title ?? copyingProductId} をコピーしました。`,
+              });
+              router.push(`/dashboard/products/${encodeURIComponent(newId)}`);
+            }}
+          />
+        );
+      })()}
 
       <OperationLogSection logs={operationLogs} />
     </div>
@@ -401,7 +404,6 @@ function DetailSheet({ product, onClose }: { product: DetailProduct; onClose: ()
         <div className="flex items-center justify-between border-b border-border bg-muted/50 px-4 py-3">
           <div>
             <h2 className="text-lg font-semibold text-foreground">{product.title}</h2>
-            <p className="text-sm text-muted-foreground">ID: {product.id}</p>
           </div>
           <button
             onClick={onClose}
@@ -561,4 +563,58 @@ function renderOperationLabel(type: OperationLogEntry["type"]) {
   if (type === "enqueue") return "送信キュー登録";
   if (type === "add") return "商品追加";
   return type;
+}
+
+export function JobsContent({ jobs }: JobsContentProps) {
+  return (
+    <div className="space-y-8">
+      <header>
+        <h1 className="text-2xl font-semibold text-foreground">ジョブステータス</h1>
+        <p className="text-sm text-muted-foreground">
+          各プラットフォームへの出品ジョブの状況を確認できます。
+        </p>
+      </header>
+
+      <section className="overflow-hidden rounded-lg border border-border bg-card shadow-sm">
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-border text-sm">
+            <thead className="bg-muted/30 text-muted-foreground">
+              <tr>
+                <th className="px-4 py-3 text-left font-medium">ジョブID</th>
+                <th className="px-4 py-3 text-left font-medium">商品</th>
+                <th className="px-4 py-3 text-left font-medium">プラットフォーム</th>
+                <th className="px-4 py-3 text-left font-medium">ステータス</th>
+                <th className="px-4 py-3 text-left font-medium">試行</th>
+                <th className="px-4 py-3 text-left font-medium">開始時刻</th>
+                <th className="px-4 py-3 text-left font-medium">所要時間</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {jobs.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="px-4 py-8 text-center text-sm text-muted-foreground">
+                    ジョブはまだありません。
+                  </td>
+                </tr>
+              ) : (
+                jobs.map((job) => (
+                  <tr key={job.id} className="bg-card">
+                    <td className="px-4 py-3 font-medium text-foreground">{job.id}</td>
+                    <td className="px-4 py-3 text-sm text-muted-foreground">{job.productId}</td>
+                    <td className="px-4 py-3"><PlatformBadges values={[job.platform]} /></td>
+                    <td className="px-4 py-3"><JobStatusBadge status={job.status} /></td>
+                    <td className="px-4 py-3 text-sm text-muted-foreground">{job.attempt ?? "-"}</td>
+                    <td className="px-4 py-3 text-sm text-muted-foreground">{formatDate(job.startedAt)}</td>
+                    <td className="px-4 py-3 text-sm text-muted-foreground">
+                      {job.durationSeconds ? `${job.durationSeconds}s` : "-"}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  );
 }
