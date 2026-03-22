@@ -105,7 +105,7 @@ export async function addProductUseCase(input: {
   await googleSheetsProductRepository.addProduct({
     productId: input.productId.trim(),
     title: input.title.trim(),
-    description: input.description?.trim() ?? "",
+    description: input.description.trim(),
     price: input.price,
     inventory: input.inventory,
     platforms: normalizedPlatforms,
