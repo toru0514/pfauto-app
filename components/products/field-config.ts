@@ -1,9 +1,9 @@
-export type FieldType = "text" | "textarea" | "number" | "multi-text";
+export type FieldType = "text" | "textarea" | "number";
 
 export type FieldSection = "basic" | "creema" | "minne" | "base" | "iichi";
 
 export type FieldConfig = {
-  key: string; // rawカラム名
+  key: string; // rawカラム名（スプシのヘッダーと完全一致）
   label: string; // 表示名
   type: FieldType;
   section: FieldSection;
@@ -18,47 +18,41 @@ export const SECTION_LABELS: Record<FieldSection, string> = {
   iichi: "iichi設定",
 };
 
+// 共通シートのカラム順に合わせた定義
 export const FIELD_CONFIGS: FieldConfig[] = [
   // === 基本情報 ===
   { key: "product_id", label: "商品ID", type: "text", section: "basic" },
+  { key: "sku", label: "SKU", type: "text", section: "basic" },
   { key: "title", label: "商品名", type: "text", section: "basic" },
   { key: "description", label: "商品説明", type: "textarea", section: "basic" },
   { key: "price", label: "価格", type: "number", section: "basic", placeholder: "例: 3500" },
   { key: "inventory", label: "在庫", type: "number", section: "basic", placeholder: "例: 5" },
+  { key: "material", label: "素材", type: "text", section: "basic" },
+  { key: "size_notes", label: "サイズ備考", type: "textarea", section: "basic" },
+  { key: "weight_grams", label: "重量(g)", type: "number", section: "basic" },
   { key: "tags", label: "タグ", type: "text", section: "basic", placeholder: "カンマ区切り" },
-  { key: "image_urls", label: "画像URL", type: "textarea", section: "basic", placeholder: "1行に1URL" },
+  { key: "image_urls", label: "画像URL", type: "textarea", section: "basic", placeholder: "カンマ区切りまたは1行に1URL" },
+  { key: "production_lead_time_days", label: "制作日数", type: "number", section: "basic", placeholder: "例: 7" },
+  { key: "shipping_fee", label: "送料", type: "number", section: "basic", placeholder: "例: 300" },
+  { key: "shipping_method", label: "配送方法", type: "text", section: "basic" },
+  { key: "shipping_origin_pref", label: "発送元都道府県", type: "text", section: "basic" },
   { key: "出品先", label: "出品先", type: "text", section: "basic", placeholder: "Creema,minne,BASE,iichi" },
+  { key: "notes_internal", label: "内部メモ", type: "textarea", section: "basic" },
 
   // === Creema ===
   { key: "creema_category_level1_label", label: "カテゴリ(大)", type: "text", section: "creema" },
-  { key: "creema_category_level1_id", label: "カテゴリ(大)ID", type: "text", section: "creema" },
   { key: "creema_category_level2_label", label: "カテゴリ(中)", type: "text", section: "creema" },
-  { key: "creema_category_level2_id", label: "カテゴリ(中)ID", type: "text", section: "creema" },
   { key: "creema_category_level3_label", label: "カテゴリ(小)", type: "text", section: "creema" },
-  { key: "creema_category_level3_id", label: "カテゴリ(小)ID", type: "text", section: "creema" },
-  { key: "creema_material_label", label: "素材", type: "text", section: "creema" },
-  { key: "creema_material_id", label: "素材ID", type: "text", section: "creema" },
-  { key: "creema_color_id", label: "カラーID", type: "text", section: "creema" },
-  { key: "creema_prefecture", label: "発送元都道府県", type: "text", section: "creema" },
-  { key: "creema_delivery_method", label: "配送方法", type: "text", section: "creema" },
-  { key: "creema_production_period", label: "制作期間", type: "text", section: "creema" },
-  { key: "creema_size", label: "サイズ", type: "text", section: "creema" },
-  { key: "creema_weight", label: "重量", type: "text", section: "creema" },
+  { key: "creema_color_ids", label: "カラーID", type: "text", section: "creema" },
 
   // === minne ===
-  { key: "minne_category_parent_id", label: "カテゴリ(親)ID", type: "text", section: "minne" },
-  { key: "minne_category_id", label: "カテゴリID", type: "text", section: "minne" },
-  { key: "minne_delivery_method", label: "配送方法", type: "text", section: "minne" },
-  { key: "minne_shipping_region", label: "発送地域", type: "text", section: "minne" },
-  { key: "minne_shipping_fee", label: "送料", type: "number", section: "minne" },
-  { key: "minne_additional_shipping_fee", label: "追加送料", type: "number", section: "minne" },
-  { key: "minne_shipping_days", label: "発送日数", type: "text", section: "minne" },
+  { key: "minne_category_parent_label", label: "カテゴリ(親)", type: "text", section: "minne" },
+  { key: "minne_category_label", label: "カテゴリ", type: "text", section: "minne" },
+  { key: "minne_shipping_additional_fee", label: "追加送料", type: "number", section: "minne" },
 
   // === iichi ===
   { key: "iichi_category_parent_label", label: "カテゴリ(親)", type: "text", section: "iichi" },
   { key: "iichi_category_child_label", label: "カテゴリ(子)", type: "text", section: "iichi" },
-  { key: "iichi_material", label: "素材", type: "text", section: "iichi" },
-  { key: "iichi_delivery_method", label: "配送方法", type: "text", section: "iichi" },
 ];
 
 /**
@@ -68,7 +62,6 @@ export const FIELD_CONFIGS: FieldConfig[] = [
 export function getExtraFields(raw: Record<string, string>): FieldConfig[] {
   const knownKeys = new Set(FIELD_CONFIGS.map((f) => f.key));
 
-  // ステータス・同期・エラー系のキーは編集対象外
   const excludePatterns = [
     /status/i,
     /synced/i,
@@ -80,9 +73,6 @@ export function getExtraFields(raw: Record<string, string>): FieldConfig[] {
     /ステータス/,
     /最終同期/,
     /エラー/,
-    /メモ/,
-    /sync_status/i,
-    /notes_internal/i,
   ];
 
   return Object.keys(raw)

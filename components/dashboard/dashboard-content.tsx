@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { ExternalLink, Copy } from "lucide-react";
 import {
   addProduct,
@@ -10,7 +11,6 @@ import {
   JobRow,
 } from "@/app/dashboard/actions";
 import { AddProductModal, type AddProductFormData } from "./add-product-modal";
-import { ProductEditPanel } from "@/components/products/product-edit-panel";
 import { CopyProductDialog } from "@/components/products/copy-product-dialog";
 import { useToast } from "@/components/providers/toast-provider";
 
@@ -34,11 +34,11 @@ type OperationLogEntry = {
 };
 
 export function DashboardContent({ products, jobs, spreadsheetUrl }: Props) {
+  const router = useRouter();
   const [pendingRefresh, startRefresh] = useTransition();
   const [pendingEnqueue, startEnqueue] = useTransition();
   const [pendingAddProduct, startAddProduct] = useTransition();
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
-  const [editingProductId, setEditingProductId] = useState<string | null>(null);
   const [copyingProductId, setCopyingProductId] = useState<string | null>(null);
   const [showAddProductModal, setShowAddProductModal] = useState(false);
   const [operationLogs, setOperationLogs] = useState<OperationLogEntry[]>([]);
@@ -195,7 +195,7 @@ export function DashboardContent({ products, jobs, spreadsheetUrl }: Props) {
                 <tr
                   key={product.id}
                   className="bg-card cursor-pointer transition hover:bg-muted/30"
-                  onClick={() => setEditingProductId(product.id)}
+                  onClick={() => router.push(`/dashboard/products/${encodeURIComponent(product.id)}`)}
                 >
                   <td className="px-4 py-3">
                     <div className="font-medium text-foreground">{product.title}</div>
@@ -325,26 +325,6 @@ export function DashboardContent({ products, jobs, spreadsheetUrl }: Props) {
         />
       )}
 
-      {editingProductId && (
-        <ProductEditPanel
-          productId={editingProductId}
-          onClose={() => setEditingProductId(null)}
-          onSaved={() => {
-            showToast({
-              title: "商品を更新しました",
-              description: `${editingProductId} の変更を保存しました。`,
-              variant: "success",
-            });
-            appendLog({
-              type: "add",
-              status: "success",
-              message: `${editingProductId} を更新しました。`,
-            });
-            setEditingProductId(null);
-          }}
-        />
-      )}
-
       {copyingProductId && (
         <CopyProductDialog
           sourceProductId={copyingProductId}
@@ -361,8 +341,7 @@ export function DashboardContent({ products, jobs, spreadsheetUrl }: Props) {
               status: "success",
               message: `${copyingProductId} → ${newId} にコピーしました。`,
             });
-            // Open the new product in edit panel
-            setEditingProductId(newId);
+            router.push(`/dashboard/products/${encodeURIComponent(newId)}`);
           }}
         />
       )}
