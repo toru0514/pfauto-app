@@ -1,78 +1,67 @@
 "use client";
 
-import { useCallback, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import { Trash2 } from "lucide-react";
 import { AddWoodModal, type AddWoodFormData } from "./add-wood-modal";
+import {
+  addWoodAction,
+  deleteWoodAction,
+  type WoodMaterial,
+} from "@/app/dashboard/woods/actions";
 import { useToast } from "@/components/providers/toast-provider";
 
-type WoodMaterial = {
-  id: string;
-  name: string;
-  imageUrl: string;
-  features: string;
-  createdAt: number;
+type Props = {
+  woods: WoodMaterial[];
 };
 
-const STORAGE_KEY = "pfauto-wood-materials";
-
-function loadWoods(): WoodMaterial[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as WoodMaterial[]) : [];
-  } catch {
-    return [];
-  }
-}
-
-function saveWoods(woods: WoodMaterial[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(woods));
-}
-
-export function WoodsContent() {
-  const [woods, setWoods] = useState<WoodMaterial[]>(() => loadWoods());
+export function WoodsContent({ woods }: Props) {
   const [showAddModal, setShowAddModal] = useState(false);
   const [pendingAdd, startAdd] = useTransition();
+  const [pendingDelete, startDelete] = useTransition();
   const { showToast } = useToast();
 
-  const handleAdd = useCallback(
-    (data: AddWoodFormData) => {
-      startAdd(() => {
-        const newWood: WoodMaterial = {
-          id: `wood-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+  const handleAdd = (data: AddWoodFormData) => {
+    startAdd(async () => {
+      try {
+        await addWoodAction({
           name: data.name,
           imageUrl: data.imageUrl,
           features: data.features,
-          createdAt: Date.now(),
-        };
-        const updated = [newWood, ...woods];
-        saveWoods(updated);
-        setWoods(updated);
+        });
         setShowAddModal(false);
         showToast({
           title: "木材を追加しました",
           description: data.name,
           variant: "success",
         });
-      });
-    },
-    [woods, showToast]
-  );
+      } catch (error) {
+        showToast({
+          title: "木材の追加に失敗しました",
+          description: error instanceof Error ? error.message : "不明なエラー",
+          variant: "error",
+        });
+      }
+    });
+  };
 
-  const handleDelete = useCallback(
-    (id: string) => {
-      const target = woods.find((w) => w.id === id);
-      const updated = woods.filter((w) => w.id !== id);
-      saveWoods(updated);
-      setWoods(updated);
-      showToast({
-        title: "木材を削除しました",
-        description: target?.name ?? "",
-        variant: "info",
-      });
-    },
-    [woods, showToast]
-  );
+  const handleDelete = (id: string, name: string) => {
+    startDelete(async () => {
+      try {
+        await deleteWoodAction(id);
+        showToast({
+          title: "木材を削除しました",
+          description: name,
+          variant: "info",
+        });
+      } catch (error) {
+        showToast({
+          title: "木材の削除に失敗しました",
+          description: error instanceof Error ? error.message : "不明なエラー",
+          variant: "error",
+        });
+      }
+    });
+  };
 
   return (
     <div className="space-y-8">
@@ -129,8 +118,9 @@ export function WoodsContent() {
                   </h3>
                   <button
                     type="button"
-                    onClick={() => handleDelete(wood.id)}
-                    className="shrink-0 rounded-md p-1 text-muted-foreground opacity-0 transition hover:bg-muted hover:text-destructive group-hover:opacity-100"
+                    onClick={() => handleDelete(wood.id, wood.name)}
+                    disabled={pendingDelete}
+                    className="shrink-0 rounded-md p-1 text-muted-foreground opacity-0 transition hover:bg-muted hover:text-destructive group-hover:opacity-100 disabled:opacity-60"
                     title="削除"
                   >
                     <Trash2 className="h-4 w-4" />
