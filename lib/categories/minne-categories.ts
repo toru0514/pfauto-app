@@ -1,3 +1,7 @@
+import { getLogger } from "@/lib/logger";
+
+const log = getLogger("minne-categories");
+
 export type MinneCategoryNode = { id: string; label: string; children?: MinneCategoryNode[] };
 
 export const MINNE_CATEGORY_TREE: MinneCategoryNode[] = [
@@ -434,11 +438,10 @@ function findAliasMatch<T extends { label: string }>(
   const hit = map.get(normalized);
   if (!hit) return null;
   if (Array.isArray(hit)) {
-    console.warn(
-      "[minne-categories] カテゴリアイテムが複数候補に一致しました",
-      raw,
-      hit.map((entry) => entry.label)
-    );
+    log.warn("カテゴリアイテムが複数候補に一致しました", {
+      input: raw,
+      candidates: hit.map((entry) => entry.label),
+    });
     return null;
   }
   return hit;

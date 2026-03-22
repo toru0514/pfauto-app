@@ -3,43 +3,17 @@
  */
 
 import { config } from "dotenv";
-import { google } from "googleapis";
 import {
   getMinneParentLabelById,
   getMinneChildLabelById,
-} from "../playwright/tests/minne-categories";
+} from "../lib/categories/minne-categories";
+import { columnIndexToLetter, getSheetsClient, getSpreadsheetId } from "./lib/sheets-utils";
 
 config({ path: ".env.local" });
 
 const SHEET_CONFIG = {
   common: process.env.GOOGLE_SHEETS_COMMON_SHEET || "共通",
 };
-
-async function getSheetsClient() {
-  const base64 = process.env.GOOGLE_SERVICE_ACCOUNT_BASE64!;
-  const credentials = JSON.parse(Buffer.from(base64, "base64").toString("utf-8"));
-  const auth = new google.auth.GoogleAuth({
-    credentials,
-    scopes: ["https://www.googleapis.com/auth/spreadsheets"],
-  });
-  return google.sheets({ version: "v4", auth });
-}
-
-function getSpreadsheetId(): string {
-  return process.env.GOOGLE_SHEETS_SPREADSHEET_ID!;
-}
-
-function columnIndexToLetter(index: number): string {
-  const baseCharCode = "A".charCodeAt(0);
-  let dividend = index + 1;
-  let columnName = "";
-  while (dividend > 0) {
-    const modulo = (dividend - 1) % 26;
-    columnName = String.fromCharCode(baseCharCode + modulo) + columnName;
-    dividend = Math.floor((dividend - modulo) / 26);
-  }
-  return columnName;
-}
 
 async function main() {
   console.log("=== minneカテゴリID→ラベル変換 ===\n");

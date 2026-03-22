@@ -12,7 +12,8 @@
  */
 
 import { config } from "dotenv";
-import { google, sheets_v4 } from "googleapis";
+import { sheets_v4 } from "googleapis";
+import { columnIndexToLetter, getSheetsClient, getSpreadsheetId } from "./lib/sheets-utils";
 
 config({ path: ".env.local" });
 
@@ -125,44 +126,6 @@ const PLATFORM_SPECIFIC_COLUMNS: Record<string, string[]> = {
     "iichi_attempt",
   ],
 };
-
-function columnIndexToLetter(index: number): string {
-  const baseCharCode = "A".charCodeAt(0);
-  let dividend = index + 1;
-  let columnName = "";
-
-  while (dividend > 0) {
-    const modulo = (dividend - 1) % 26;
-    columnName = String.fromCharCode(baseCharCode + modulo) + columnName;
-    dividend = Math.floor((dividend - modulo) / 26);
-  }
-
-  return columnName;
-}
-
-async function getSheetsClient(): Promise<sheets_v4.Sheets> {
-  const base64 = process.env.GOOGLE_SERVICE_ACCOUNT_BASE64;
-  if (!base64) {
-    throw new Error("GOOGLE_SERVICE_ACCOUNT_BASE64 が設定されていません。");
-  }
-
-  const credentials = JSON.parse(Buffer.from(base64, "base64").toString("utf-8"));
-
-  const auth = new google.auth.GoogleAuth({
-    credentials,
-    scopes: ["https://www.googleapis.com/auth/spreadsheets"],
-  });
-
-  return google.sheets({ version: "v4", auth });
-}
-
-function getSpreadsheetId(): string {
-  const spreadsheetId = process.env.GOOGLE_SHEETS_SPREADSHEET_ID;
-  if (!spreadsheetId) {
-    throw new Error("GOOGLE_SHEETS_SPREADSHEET_ID が設定されていません。");
-  }
-  return spreadsheetId;
-}
 
 async function getSheetIds(
   sheets: sheets_v4.Sheets,

@@ -4,7 +4,7 @@ import type { SpreadsheetProductRecord } from "@/application/types/product";
 import {
   resolveMinneParentIdByLabel,
   resolveMinneChildIdByLabel,
-} from "./minne-categories";
+} from "@/lib/categories/minne-categories";
 import { MinnePage } from "./page-objects/minne-page";
 import { GmailClient } from "./shared/gmail-client";
 import { pickFirstNonEmpty, parseInteger, parseImageUrls, normalizeId, cleanupTempFiles } from "./shared/utils";

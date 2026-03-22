@@ -14,7 +14,7 @@ import { getGoogleSheetsRateLimiter } from "@/lib/rate-limiter";
 import {
   resolveMinneParentIdByLabel,
   resolveMinneChildIdByLabel,
-} from "@/playwright/tests/minne-categories";
+} from "@/lib/categories/minne-categories";
 
 const log = getLogger("google-sheets-repository");
 const rateLimiter = getGoogleSheetsRateLimiter();
@@ -41,44 +41,13 @@ type AllSheetsData = {
   };
 };
 
-// iichi用マッピングテーブル
-const IICHI_SHIPPING_METHOD_MAP: Record<string, string> = {
-  クリックポスト: "クリックポスト",
-  宅急便コンパクト: "宅急便コンパクト",
-  ゆうパック: "ゆうパック",
-  レターパック: "レターパック",
-  レターパックプラス: "レターパックプラス",
-  レターパックライト: "レターパックライト",
-  ネコポス: "ネコポス",
-  宅急便: "宅急便",
-  定形外郵便: "定形外郵便",
-  普通郵便: "普通郵便",
-  ゆうメール: "ゆうメール",
-  佐川急便: "佐川急便",
-};
-
+// iichi用素材マッピング（別名→正式名の変換のみ）
 const IICHI_MATERIAL_MAP: Record<string, string> = {
-  木材: "木材",
   木: "木材",
   ウッド: "木材",
-  真鍮: "真鍮",
-  ガラス: "ガラス",
-  陶器: "陶器",
-  磁器: "磁器",
-  布: "布",
-  革: "革",
   レザー: "革",
-  金属: "金属",
-  銀: "銀",
   シルバー: "銀",
-  銅: "銅",
-  鉄: "鉄",
-  ステンレス: "ステンレス",
-  樹脂: "樹脂",
   プラスチック: "樹脂",
-  紙: "紙",
-  竹: "竹",
-  漆: "漆",
 };
 const MOCK_SHEET_MATRIX: SheetMatrix = {
   headerRow: [
@@ -254,10 +223,6 @@ function getSheetConfig(): SheetConfig {
 function isMultiSheetMode(): boolean {
   // 共通シートの環境変数が設定されていればマルチシートモード
   return !!process.env.GOOGLE_SHEETS_COMMON_SHEET;
-}
-
-function mapToIichiShippingLabel(method: string): string {
-  return IICHI_SHIPPING_METHOD_MAP[method] ?? method;
 }
 
 function mapToIichiMaterialLabel(material: string): string {
@@ -521,73 +486,19 @@ export class GoogleSheetsProductRepository implements ProductRepositoryPort {
       const productId = productIdIndex !== null ? commonRow[productIdIndex] ?? "" : "";
       if (!productId) return;
 
-      // 共通シートからベース値を取得
       const baseRaw = buildRawRecord(commonHeader, commonRow);
+      const { mergedRaw, platformSnapshots } = this.mergePlatformOverrides(
+        productId, baseRaw, pfRowsByProductId
+      );
 
-      // 各PFシートから上書き値をマージ
-      const mergedRaw: Record<string, string> = { ...baseRaw };
-      const allPlatformSnapshots: PlatformJobSnapshot[] = [];
-
-      for (const [pfName, pfData] of Object.entries(pfRowsByProductId)) {
-        const pfRecord = pfData[productId];
-        if (!pfRecord) continue;
-
-        const { row: pfRow, header: pfHeader } = pfRecord;
-        const pfRaw = buildRawRecord(pfHeader, pfRow);
-
-        // PF固有列をマージ（プレフィックス付きの列）
-        for (const [key, value] of Object.entries(pfRaw)) {
-          const normalizedKey = normalizeHeaderName(key);
-          // PF固有列（プレフィックス付き）または上書き値がある場合のみマージ
-          if (normalizedKey.startsWith(pfName) || (value && !baseRaw[key])) {
-            mergedRaw[key] = value;
-          }
-          // 共通列の上書き: 値が存在し、空でない場合は上書き
-          if (value && baseRaw[key] !== undefined && value !== baseRaw[key]) {
-            // 上書きフラグとして _override_ プレフィックスをつける
-            mergedRaw[`${pfName}_override_${key}`] = value;
-          }
-        }
-
-        // PFスナップショットを抽出
-        const pfSnapshots = extractPlatformSnapshots(pfRaw);
-        allPlatformSnapshots.push(...pfSnapshots);
-      }
-
-      // iichi用のマッピングを適用
-      const materialIndex = findColumnIndex(commonHeader, COMMON_HEADER_ALIASES.material);
-      const shippingMethodIndex = findColumnIndex(commonHeader, COMMON_HEADER_ALIASES.shippingMethod);
-
-      if (materialIndex !== null && commonRow[materialIndex]) {
-        mergedRaw["iichi_material_label"] = mapToIichiMaterialLabel(commonRow[materialIndex]);
-      }
-      if (shippingMethodIndex !== null && commonRow[shippingMethodIndex]) {
-        mergedRaw["iichi_shipping_method_label"] = mapToIichiShippingLabel(commonRow[shippingMethodIndex]);
-      }
-
-      // minne用: ラベル→ID変換
-      const minneParentLabel = mergedRaw["minne_category_parent_label"];
-      const minneChildLabel = mergedRaw["minne_category_label"];
-
-      if (minneParentLabel) {
-        const parentId = resolveMinneParentIdByLabel(minneParentLabel);
-        if (parentId) {
-          mergedRaw["minne_category_parent_id"] = parentId;
-        }
-      }
-      if (minneParentLabel && minneChildLabel) {
-        const childId = resolveMinneChildIdByLabel(minneParentLabel, minneChildLabel);
-        if (childId) {
-          mergedRaw["minne_category_id"] = childId;
-        }
-      }
+      this.applyIichiMappings(mergedRaw, commonHeader, commonRow);
+      this.applyMinneCategoryResolution(mergedRaw);
 
       // 既存のスナップショットを共通シートから抽出してマージ
       const commonSnapshots = extractPlatformSnapshots(baseRaw);
       for (const cs of commonSnapshots) {
-        // PFシートからのスナップショットがなければ共通シートのを使用
-        if (!allPlatformSnapshots.some(ps => ps.platform === cs.platform)) {
-          allPlatformSnapshots.push(cs);
+        if (!platformSnapshots.some(ps => ps.platform === cs.platform)) {
+          platformSnapshots.push(cs);
         }
       }
 
@@ -616,12 +527,87 @@ export class GoogleSheetsProductRepository implements ProductRepositoryPort {
         syncStatus,
         lastSyncedAt,
         lastError,
-        platformSnapshots: allPlatformSnapshots,
+        platformSnapshots,
         raw: mergedRaw,
       });
     });
 
     return records;
+  }
+
+  /**
+   * 各PFシートの値を共通シートのベース値にマージする
+   */
+  private mergePlatformOverrides(
+    productId: string,
+    baseRaw: Record<string, string>,
+    pfRowsByProductId: Record<string, Record<string, { row: string[]; header: string[] }>>,
+  ): { mergedRaw: Record<string, string>; platformSnapshots: PlatformJobSnapshot[] } {
+    const mergedRaw: Record<string, string> = { ...baseRaw };
+    const platformSnapshots: PlatformJobSnapshot[] = [];
+
+    for (const [pfName, pfData] of Object.entries(pfRowsByProductId)) {
+      const pfRecord = pfData[productId];
+      if (!pfRecord) continue;
+
+      const pfRaw = buildRawRecord(pfRecord.header, pfRecord.row);
+
+      for (const [key, value] of Object.entries(pfRaw)) {
+        const normalizedKey = normalizeHeaderName(key);
+        // PF固有列（プレフィックス付き）、または共通シートにキーが存在しない列をマージ
+        if (normalizedKey.startsWith(pfName) || (value && !(key in baseRaw))) {
+          mergedRaw[key] = value;
+        }
+        // 共通列の上書き: 値が存在し、異なる場合はoverride記録
+        if (value && key in baseRaw && value !== baseRaw[key]) {
+          mergedRaw[`${pfName}_override_${key}`] = value;
+        }
+      }
+
+      platformSnapshots.push(...extractPlatformSnapshots(pfRaw));
+    }
+
+    return { mergedRaw, platformSnapshots };
+  }
+
+  /**
+   * iichi用の素材・配送方法マッピングを適用
+   */
+  private applyIichiMappings(
+    mergedRaw: Record<string, string>,
+    commonHeader: string[],
+    commonRow: string[],
+  ): void {
+    const materialIndex = findColumnIndex(commonHeader, COMMON_HEADER_ALIASES.material);
+    const shippingMethodIndex = findColumnIndex(commonHeader, COMMON_HEADER_ALIASES.shippingMethod);
+
+    if (materialIndex !== null && commonRow[materialIndex]) {
+      mergedRaw["iichi_material_label"] = mapToIichiMaterialLabel(commonRow[materialIndex]);
+    }
+    if (shippingMethodIndex !== null && commonRow[shippingMethodIndex]) {
+      mergedRaw["iichi_shipping_method_label"] = commonRow[shippingMethodIndex];
+    }
+  }
+
+  /**
+   * minne用のカテゴリラベル→ID変換を適用
+   */
+  private applyMinneCategoryResolution(mergedRaw: Record<string, string>): void {
+    const parentLabel = mergedRaw["minne_category_parent_label"];
+    const childLabel = mergedRaw["minne_category_label"];
+
+    if (parentLabel) {
+      const parentId = resolveMinneParentIdByLabel(parentLabel);
+      if (parentId) {
+        mergedRaw["minne_category_parent_id"] = parentId;
+      }
+    }
+    if (parentLabel && childLabel) {
+      const childId = resolveMinneChildIdByLabel(parentLabel, childLabel);
+      if (childId) {
+        mergedRaw["minne_category_id"] = childId;
+      }
+    }
   }
 
   async findProductById(
