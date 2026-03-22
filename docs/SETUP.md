@@ -35,6 +35,21 @@ GOOGLE_SHEETS_WORKSHEET_TITLE=シート1
 USE_MOCK_SHEETS_DATA=false
 ```
 
+### Gmail API 連携（minne ログイン自動化）
+
+```bash
+# Google OAuth2 クライアント
+GOOGLE_CLIENT_ID=xxxxx.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=xxxxx
+
+# Gmail OAuth2 トークン
+# アクセストークンは期限切れ時にリフレッシュトークンで自動更新されます
+GMAIL_ACCESS_TOKEN=ya29.xxxxx
+GMAIL_REFRESH_TOKEN=1//xxxxx
+```
+
+> `PLAYWRIGHT_RUN_MINNE=true` でテスト実行時のみ必要です。
+
 ### Sentry エラー監視（任意）
 
 ```bash

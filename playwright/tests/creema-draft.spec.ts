@@ -1,9 +1,4 @@
 import { expect, test } from "@playwright/test";
-import type { Page } from "@playwright/test";
-import { promises as fs } from "fs";
-import os from "os";
-import path from "path";
-import { randomUUID } from "crypto";
 import { googleSheetsProductRepository } from "@/adapters/google-sheets/product-repository";
 import type { SpreadsheetProductRecord } from "@/application/types/product";
 import {
@@ -11,6 +6,8 @@ import {
   isValidCreemaLevel2CategoryId,
   resolveCreemaCategoryPath,
 } from "./creema-categories";
+import { CreemaPage } from "./page-objects/creema-page";
+import { pickFirstNonEmpty, parseInteger, parseImageUrls, normalizeId } from "./shared/utils";
 
 const RUN_CREEMA_FLOW = process.env.PLAYWRIGHT_RUN_CREEMA === "true";
 // デバッグ用ログ（必要に応じて削除）
@@ -18,35 +15,6 @@ console.log(
   "[creema-draft] PLAYWRIGHT_RUN_CREEMA=",
   JSON.stringify(process.env.PLAYWRIGHT_RUN_CREEMA)
 );
-const CREEMA_LOGIN_PATH = "/user/login";
-const CREEMA_AFTER_LOGIN_PATH = "/my/home";
-const CREEMA_NEW_ITEM_PATH = "/my/item/create";
-
-const selectors = {
-  loginEmail: "input[name='email']", // TODO: フォーム構造に合わせて更新
-  loginPassword: "input[name='password']",
-  loginSubmit: "input.js-user-login-button",
-  titleInput: "#form-item-title",
-  descriptionInput: "#form-item-description",
-  priceInput: "#form-item-price",
-  stockSelect: "select.js-attach-stock",
-  materialSelect: "#form-item-material-id",
-  imageFileInput: "input.js-file-upload",
-  shippingOriginSelect: "select[name='item[delivery_from_prefecture_id]']",
-  shippingMethodSelect: "select[name='item[shipping_methods][]']",
-  craftPeriodSelect: "select[name='item[craft_period]']",
-  sizeTextarea: "#form-item-size-freeinput",
-  categoryLevel1Select: "#form-item-level1-category-id",
-  categoryLevel2Select: "#form-item-level2-category-id",
-  categoryLevel3Select: "#form-item-level3-category-id",
-  colorCheckboxes: "input.js-item-skus-color-ids",
-  categoryLevel1Select: "#form-item-level1-category-id",
-  categoryLevel2Select: "#form-item-level2-category-id",
-  tagHiddenInput: "#form-item-tags",
-  nextStepButton: "input.js-item-next",
-  confirmButton: "input.js-item-confirm",
-  saveDraftButton: "input.js-item-form-draft",
-};
 
 const CREEMA_MATERIAL_OPTIONS = [
   { id: "2", label: "シルバー", aliases: ["銀", "silver", "sv"] },
@@ -166,216 +134,119 @@ test.describe("Creema 自動化フロー", () => {
     );
     test.skip(!products.length, "Creema 対象のシート商品が見つかりませんでした。");
 
-    testInfo.annotations.push({
-      type: "TODO",
-      description:
-        "selectors オブジェクトを実際の Creema 画面に合わせて調整してください。",
-    });
+    const creemaPage = new CreemaPage(page);
+    const origin = baseURL ?? "https://www.creema.jp";
 
-    await test.step("ログインページへ遷移", async () => {
-      await page.goto(`${baseURL ?? "https://www.creema.jp"}${CREEMA_LOGIN_PATH}`);
-      await expect(page).toHaveURL(/\/user\/login/);
-    });
-
-    await test.step("認証情報を入力", async () => {
-      await page.fill(selectors.loginEmail, email!);
-      await page.fill(selectors.loginPassword, password!);
-      await Promise.all([
-        page.waitForURL(
-          `${baseURL ?? "https://www.creema.jp"}${CREEMA_AFTER_LOGIN_PATH}`,
-          { timeout: 120_000 }
-        ),
-        page.click(selectors.loginSubmit),
-      ]);
+    await test.step("ログイン", async () => {
+      await creemaPage.login(email!, password!, origin);
     });
 
     await test.step("商品登録画面を開く", async () => {
-      await page.goto(`${baseURL ?? "https://www.creema.jp"}${CREEMA_NEW_ITEM_PATH}`);
-      await expect(page).toHaveURL(/\/my\/item\/create/);
+      await creemaPage.navigateToNewItem(origin);
     });
 
     for (const product of products) {
       const mapped = mapProductToCreemaDraft(product);
 
       await test.step(`フォームに商品情報を入力 (${product.id})`, async () => {
-        await page.goto(`${baseURL ?? "https://www.creema.jp"}${CREEMA_NEW_ITEM_PATH}`);
-        await expect(page).toHaveURL(/\/my\/item\/create/);
-      if (mapped.imageUrls.length) {
-        await uploadImages(page, selectors.imageFileInput, mapped.imageUrls);
-      }
+        await creemaPage.navigateToNewItem(origin);
 
-      await page.fill(selectors.titleInput, mapped.title);
-      await page.fill(selectors.descriptionInput, mapped.description);
-      await page.fill(selectors.priceInput, mapped.price);
-      await page.selectOption(selectors.stockSelect, mapped.stock);
+        if (mapped.imageUrls.length) {
+          await creemaPage.uploadImages(mapped.imageUrls);
+        }
 
-      if (mapped.materialId) {
-        const materialSelect = page.locator(selectors.materialSelect);
-        await expect(materialSelect).toBeAttached();
-        await materialSelect.selectOption(mapped.materialId).catch(() => {
+        await creemaPage.fillTitle(mapped.title);
+        await creemaPage.fillDescription(mapped.description);
+        await creemaPage.fillPrice(mapped.price);
+        await creemaPage.selectStock(mapped.stock);
+
+        if (mapped.materialId) {
+          await creemaPage.selectMaterial(mapped.materialId);
+        } else {
           console.warn(
-            "[creema-draft] material option not selectable",
-            mapped.materialId
+            "[creema-draft] material not resolved",
+            product!.id,
+            product!.raw["creema_material_id"],
+            product!.raw["creema_material_label"],
+            product!.raw["material"]
           );
-        });
-      } else {
-        console.warn(
-          "[creema-draft] material not resolved",
-          product!.id,
-          product!.raw["creema_material_id"],
-          product!.raw["creema_material_label"],
-          product!.raw["material"]
+        }
+
+        await creemaPage.selectCategory(
+          mapped.categoryLevel1Id,
+          mapped.categoryLevel2Id,
+          mapped.categoryLevel3Id,
+          mapped.categoryLevel3Label
         );
-      }
 
-      if (mapped.categoryLevel1Id) {
-        await page.selectOption(selectors.categoryLevel1Select, mapped.categoryLevel1Id);
+        if (mapped.colorIds.length) {
+          await creemaPage.checkColors(mapped.colorIds);
+        }
 
-        if (mapped.categoryLevel2Id) {
-          const level2 = page.locator(selectors.categoryLevel2Select);
-          await expect(level2).toBeEnabled({ timeout: 15_000 });
+        // キーワードタグの入力は一時停止（使用不可文字の検証後に再開）
 
-          const optionLocator = page.locator(
-            `${selectors.categoryLevel2Select} option[value="${mapped.categoryLevel2Id}"]`
-          );
-          await expect(optionLocator).toHaveCount(1, { timeout: 15_000 });
+        // TODO: 画像アップロードなど、Creema 固有の必須項目を追記
+      });
 
-          await level2.selectOption(mapped.categoryLevel2Id).catch(async () => {
-            console.warn(
-              "[creema-draft] level2 option not selectable",
-              mapped.categoryLevel2Id
-            );
-          });
+      await test.step("発送情報を入力", async () => {
+        await creemaPage.goToShippingStep();
 
-          if (mapped.categoryLevel3Id || mapped.categoryLevel3Label) {
-            const success = await setSelectValueByIdOrLabel(
-              page,
-              selectors.categoryLevel3Select,
-              mapped.categoryLevel3Id,
-              mapped.categoryLevel3Label
-            );
-            if (!success) {
-              console.warn(
-                "[creema-draft] level3 option not selectable",
-                mapped.categoryLevel3Id ?? mapped.categoryLevel3Label
-              );
-            }
+        if (mapped.shippingOriginPrefectureId) {
+          if (!(await creemaPage.fillShippingOrigin(mapped.shippingOriginPrefectureId))) {
+            console.warn("[creema-draft] shipping origin not selectable", mapped.shippingOriginPrefectureId);
+          }
+        } else if (
+          pickFirstNonEmpty(
+            product!.raw["creema_shipping_origin_pref"],
+            product!.raw["shipping_origin_pref"],
+            product!.raw["発送元都道府県"],
+            product!.raw["発送元"]
+          )
+        ) {
+          console.warn("[creema-draft] shipping origin not resolved", product!.id);
+        }
+
+        if (mapped.shippingMethodId) {
+          if (!(await creemaPage.fillShippingMethod(mapped.shippingMethodId))) {
+            console.warn("[creema-draft] shipping method not selectable", mapped.shippingMethodId);
+          }
+        } else if (
+          pickFirstNonEmpty(
+            product!.raw["creema_shipping_method"],
+            product!.raw["shipping_method"],
+            product!.raw["配送方法"]
+          )
+        ) {
+          console.warn("[creema-draft] shipping method not resolved", product!.id);
+        }
+
+        if (mapped.craftPeriodId) {
+          if (!(await creemaPage.fillCraftPeriod(mapped.craftPeriodId))) {
+            console.warn("[creema-draft] craft period not selectable", mapped.craftPeriodId);
+          }
+        } else if (
+          pickFirstNonEmpty(
+            product!.raw["creema_craft_period_days"],
+            product!.raw["production_lead_time_days"],
+            product!.raw["制作期間"]
+          )
+        ) {
+          console.warn("[creema-draft] craft period not resolved", product!.id);
+        }
+
+        if (mapped.sizeFreeInput) {
+          if (!(await creemaPage.fillSizeFreeInput(mapped.sizeFreeInput))) {
+            console.warn("[creema-draft] size textarea not fillable", mapped.sizeFreeInput);
           }
         }
-      }
 
-      if (mapped.colorIds.length) {
-        for (const colorId of mapped.colorIds) {
-          const checkbox = page.locator(`${selectors.colorCheckboxes}[value="${colorId}"]`);
-          await expect(checkbox).toBeVisible();
-          await checkbox.check({ force: true });
-        }
-      }
+        await creemaPage.confirmAndSaveDraft();
 
-      // キーワードタグの入力は一時停止（使用不可文字の検証後に再開）
-
-      // TODO: 画像アップロードなど、Creema 固有の必須項目を追記
-    });
-
-    await test.step("発送情報を入力", async () => {
-      await page.click(selectors.nextStepButton);
-
-      if (mapped.shippingOriginPrefectureId) {
-        const success = await setSelectValue(
-          page,
-          selectors.shippingOriginSelect,
-          mapped.shippingOriginPrefectureId
-        );
-        if (!success) {
-          console.warn(
-            "[creema-draft] shipping origin option not selectable",
-            mapped.shippingOriginPrefectureId
-          );
-        }
-      } else if (
-        pickFirstNonEmpty(
-          product!.raw["creema_shipping_origin_pref"],
-          product!.raw["shipping_origin_pref"],
-          product!.raw["発送元都道府県"],
-          product!.raw["発送元"]
-        )
-      ) {
-        console.warn("[creema-draft] shipping origin not resolved", product!.id);
-      }
-
-      if (mapped.shippingMethodId) {
-        const success = await setSelectValue(
-          page,
-          selectors.shippingMethodSelect,
-          mapped.shippingMethodId
-        );
-        if (!success) {
-          console.warn(
-            "[creema-draft] shipping method not selectable",
-            mapped.shippingMethodId
-          );
-        }
-      } else if (
-        pickFirstNonEmpty(
-          product!.raw["creema_shipping_method"],
-          product!.raw["shipping_method"],
-          product!.raw["配送方法"]
-        )
-      ) {
-        console.warn("[creema-draft] shipping method not resolved", product!.id);
-      }
-
-      if (mapped.craftPeriodId) {
-        const success = await setSelectValue(
-          page,
-          selectors.craftPeriodSelect,
-          mapped.craftPeriodId
-        );
-        if (!success) {
-          console.warn(
-            "[creema-draft] craft period not selectable",
-            mapped.craftPeriodId
-          );
-        }
-      } else if (
-        pickFirstNonEmpty(
-          product!.raw["creema_craft_period_id"],
-          product!.raw["production_lead_time_days"],
-          product!.raw["制作期間"]
-        )
-      ) {
-        console.warn("[creema-draft] craft period not resolved", product!.id);
-      }
-
-      if (mapped.sizeFreeInput) {
-        const success = await setTextareaValue(page, selectors.sizeTextarea, mapped.sizeFreeInput);
-        if (!success) {
-          console.warn("[creema-draft] size textarea not fillable", mapped.sizeFreeInput);
-        }
-      }
-        const confirmButton = page.locator(selectors.confirmButton);
-        await expect(confirmButton).toBeVisible();
-        await Promise.all([
-          page.waitForNavigation({ waitUntil: "load" }),
-          confirmButton.click(),
-        ]);
-        await expect(page).toHaveURL(/\/my\/item\/input\/preview/);
         testInfo.annotations.push({
           type: "NEXT",
           description:
             "プレビューで内容を確認し、下書きを保存する場合は保存ボタンをクリックしてください。",
         });
-
-        const saveButton = page
-          .locator(`${selectors.saveDraftButton}[value="保存する"]:visible`)
-          .first();
-        await expect(saveButton).toBeVisible();
-        await saveButton.scrollIntoViewIfNeeded();
-        await Promise.all([
-          page.waitForNavigation({ waitUntil: "load" }),
-          saveButton.click(),
-        ]);
-        await expect(page).toHaveURL(/\/my\/item\/list\?status=draft/);
       });
     }
   });
@@ -591,180 +462,12 @@ function mapProductToCreemaDraft(product: SpreadsheetProductRecord): CreemaDraft
   };
 }
 
-function normalizeId(value: string | undefined): string | null {
-  if (!value) return null;
-  const trimmed = value.trim();
-  return trimmed.length ? trimmed : null;
-}
-
 function parseColorIds(value: string): string[] {
   if (!value) return [];
   return value
     .split(/[\s,、;]+/)
     .map((entry) => entry.trim())
     .filter(Boolean);
-}
-
-function parseImageUrls(value: string | null | undefined): string[] {
-  if (!value) return [];
-  return value
-    .split(/[\n,]+/)
-    .map((entry) => entry.trim())
-    .filter(Boolean);
-}
-
-async function setSelectValue(page: Page, selector: string, value: string): Promise<boolean> {
-  if (!value) return false;
-  return page.evaluate(
-    ({ selector, value }) => {
-      const element = document.querySelector<HTMLSelectElement>(selector);
-      if (!element) return false;
-      const hasOption = Array.from(element.options).some((option) => option.value === value);
-      if (!hasOption) return false;
-      element.value = value;
-      const ev = { bubbles: true, cancelable: true };
-      element.dispatchEvent(new Event("input", ev));
-      element.dispatchEvent(new Event("change", ev));
-      return true;
-    },
-    { selector, value }
-  );
-}
-
-async function setSelectValueByIdOrLabel(
-  page: Page,
-  selector: string,
-  id: string | null,
-  label: string | null
-): Promise<boolean> {
-  if (!id && !label) return false;
-  const selectLocator = page.locator(selector);
-  if (!(await selectLocator.count())) return false;
-  await page
-    .waitForFunction(
-      (sel) => {
-        const element = document.querySelector<HTMLSelectElement>(sel);
-        return !!element && element.options.length > 1;
-      },
-      selector,
-      { timeout: 10_000 }
-    )
-    .catch(() => {});
-
-  return page.evaluate(
-    ({ selector, id, label }) => {
-      const element = document.querySelector<HTMLSelectElement>(selector);
-      if (!element) return false;
-      const style = window.getComputedStyle(element);
-      if (style.display === "none" || style.visibility === "hidden") {
-        element.classList.remove("u-hide");
-        element.style.display = "";
-        element.removeAttribute("style");
-      }
-      const options = Array.from(element.options);
-      let targetValue: string | null = null;
-      if (id && options.some((option) => option.value === id)) {
-        targetValue = id;
-      } else if (label) {
-        const normalizedLabel = label.trim();
-        const matched = options.find((option) =>
-          (option.textContent ?? "").trim() === normalizedLabel
-        );
-        if (matched) {
-          targetValue = matched.value;
-        }
-      }
-      if (!targetValue) return false;
-      element.value = targetValue;
-      const ev = { bubbles: true, cancelable: true };
-      element.dispatchEvent(new Event("input", ev));
-      element.dispatchEvent(new Event("change", ev));
-      return true;
-    },
-    { selector, id, label }
-  );
-}
-
-async function setTextareaValue(page: Page, selector: string, value: string): Promise<boolean> {
-  if (!value) return false;
-  return page.evaluate(
-    ({ selector, value }) => {
-      const element = document.querySelector<HTMLTextAreaElement>(selector);
-      if (!element) return false;
-      element.value = value;
-      const ev = { bubbles: true, cancelable: true };
-      element.dispatchEvent(new Event("input", ev));
-      element.dispatchEvent(new Event("change", ev));
-      return true;
-    },
-    { selector, value }
-  );
-}
-
-async function uploadImages(page: Page, selector: string, urls: string[]): Promise<void> {
-  const normalized = Array.from(new Set(urls.filter(Boolean))).slice(0, 10);
-  if (!normalized.length) return;
-  console.log("[creema-draft] image upload start", normalized);
-  const files = await downloadImages(normalized);
-  console.log("[creema-draft] image downloaded", files);
-  if (!files.length) return;
-  try {
-    await expect(page.locator(selector)).toBeAttached();
-    await page.setInputFiles(selector, files);
-    await waitForImagePreview(page, files.length);
-    console.log("[creema-draft] image upload completed", files);
-  } catch (error) {
-    console.warn("[creema-draft] image upload failed", error);
-  } finally {
-    await Promise.all(
-      files.map((file) =>
-        fs
-          .unlink(file)
-          .catch((unlinkError) => console.warn("[creema-draft] temp image cleanup failed", file, unlinkError))
-      )
-    );
-  }
-}
-
-async function downloadImages(urls: string[]): Promise<string[]> {
-  const results: string[] = [];
-  for (const url of urls) {
-    try {
-      const response = await fetch(url);
-      if (!response.ok) {
-        console.warn("[creema-draft] image download failed", url, response.status);
-        continue;
-      }
-      const arrayBuffer = await response.arrayBuffer();
-      const ext = (() => {
-        try {
-          const pathname = new URL(url).pathname;
-          const candidate = path.extname(pathname);
-          return candidate || ".jpg";
-        } catch {
-          return ".jpg";
-        }
-      })();
-      const tempPath = path.join(os.tmpdir(), `creema-image-${randomUUID()}${ext}`);
-      await fs.writeFile(tempPath, Buffer.from(arrayBuffer));
-      console.log("[creema-draft] image saved", url, tempPath, arrayBuffer.byteLength);
-      results.push(tempPath);
-    } catch (error) {
-      console.warn("[creema-draft] image download failed", url, error);
-    }
-  }
-  return results;
-}
-
-async function waitForImagePreview(page: Page, expectedCount: number): Promise<void> {
-  try {
-    const preview = page.locator("#js-preview-item-image");
-    await preview.waitFor({ state: "visible", timeout: 15_000 });
-    const previewItems = preview.locator(".p-item-preview-images__media, .p-item-preview-images__seed");
-    await expect(previewItems).toHaveCount(expectedCount, { timeout: 15_000 });
-  } catch (error) {
-    console.warn("[creema-draft] image preview wait failed", error);
-  }
 }
 
 function resolvePrefectureId(value: string | null | undefined): string | null {
@@ -809,25 +512,6 @@ function buildSizeFreeInput(
     parts.push(`重量: ${weightValue}g`);
   }
   return parts.length ? parts.join("\n") : null;
-}
-
-function parseInteger(value: string | null | undefined): number | null {
-  if (!value) return null;
-  const sanitized = value.replace(/[^0-9.+-]/g, "");
-  if (!sanitized.length) return null;
-  const parsed = Number.parseFloat(sanitized);
-  return Number.isFinite(parsed) ? Math.round(parsed) : null;
-}
-
-function pickFirstNonEmpty(
-  ...values: Array<string | null | undefined>
-): string | null {
-  for (const value of values) {
-    if (value && value.trim()) {
-      return value;
-    }
-  }
-  return null;
 }
 
 function buildPrefectureAliasMap(
