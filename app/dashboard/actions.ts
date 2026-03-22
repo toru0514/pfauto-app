@@ -66,7 +66,6 @@ export async function addProduct(input: unknown) {
   revalidatePath("/");
 }
 
-<<<<<<< HEAD
 export type ProductDetail = SpreadsheetProductRecord;
 
 export async function getProductDetail(
