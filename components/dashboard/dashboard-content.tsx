@@ -37,6 +37,40 @@ type OperationLogEntry = {
   createdAt: number;
 };
 
+/** microCMS画像URLにリサイズパラメータを安全に付与する */
+function buildThumbnailSrc(raw: string): string {
+  try {
+    const url = new URL(raw);
+    url.searchParams.set("w", "80");
+    url.searchParams.set("h", "80");
+    url.searchParams.set("fit", "crop");
+    return url.toString();
+  } catch {
+    return raw;
+  }
+}
+
+function NoImagePlaceholder() {
+  return (
+    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-border bg-muted text-xs text-muted-foreground">
+      No img
+    </div>
+  );
+}
+
+function ProductThumbnail({ url }: { url: string }) {
+  const [failed, setFailed] = useState(false);
+  if (failed) return <NoImagePlaceholder />;
+  return (
+    <img
+      src={buildThumbnailSrc(url)}
+      alt=""
+      className="h-10 w-10 shrink-0 rounded-md border border-border object-cover"
+      onError={() => setFailed(true)}
+    />
+  );
+}
+
 export function DashboardContent({ products, jobs, spreadsheetUrl }: Props) {
   const router = useRouter();
   const [pendingRefresh, startRefresh] = useTransition();
@@ -204,15 +238,9 @@ export function DashboardContent({ products, jobs, spreadsheetUrl }: Props) {
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
                       {product.imageUrl ? (
-                        <img
-                          src={`${product.imageUrl}?w=80&h=80&fit=crop`}
-                          alt=""
-                          className="h-10 w-10 shrink-0 rounded-md border border-border object-cover"
-                        />
+                        <ProductThumbnail url={product.imageUrl} />
                       ) : (
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-border bg-muted text-xs text-muted-foreground">
-                          No img
-                        </div>
+                        <NoImagePlaceholder />
                       )}
                       <div className="font-medium text-foreground">{product.title}</div>
                     </div>

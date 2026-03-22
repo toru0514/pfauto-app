@@ -2,6 +2,9 @@ import { googleSheetsProductRepository } from "@/adapters/google-sheets/product-
 import type { SpreadsheetProductRecord } from "@/application/types/product";
 import type { JobStatus, ProductStatus } from "@/application/types/status";
 
+/** スプレッドシートの raw カラム名 */
+const RAW_COLUMN_IMAGE_URLS = "image_urls";
+
 export type DashboardProduct = {
   id: string;
   title: string;
@@ -133,7 +136,7 @@ function mapRecordToDashboardProduct(
         .filter((value): value is string => Boolean(value))
     );
 
-  const rawImageUrls = record.raw["image_urls"] ?? "";
+  const rawImageUrls = record.raw[RAW_COLUMN_IMAGE_URLS] ?? "";
   const firstImageUrl =
     rawImageUrls
       .split(/[,\n]/)
