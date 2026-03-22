@@ -13,6 +13,7 @@ export type DashboardProduct = {
   inventory: number | null;
   tags: string[];
   description: string;
+  imageUrl: string | null;
 };
 
 export type DashboardJob = {
@@ -132,6 +133,13 @@ function mapRecordToDashboardProduct(
         .filter((value): value is string => Boolean(value))
     );
 
+  const rawImageUrls = record.raw["image_urls"] ?? "";
+  const firstImageUrl =
+    rawImageUrls
+      .split(/[,\n]/)
+      .map((u) => u.trim())
+      .find((u) => u.length > 0) ?? null;
+
   return {
     id: record.id,
     title: productTitle,
@@ -143,6 +151,7 @@ function mapRecordToDashboardProduct(
     inventory: record.inventory,
     tags: record.tags,
     description: record.description,
+    imageUrl: firstImageUrl,
   };
 }
 

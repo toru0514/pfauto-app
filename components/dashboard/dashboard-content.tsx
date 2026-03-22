@@ -191,7 +191,20 @@ export function DashboardContent({ products, jobs, spreadsheetUrl }: Props) {
                   onClick={() => router.push(`/dashboard/products/${encodeURIComponent(product.id)}`)}
                 >
                   <td className="px-4 py-3">
-                    <div className="font-medium text-foreground">{product.title}</div>
+                    <div className="flex items-center gap-3">
+                      {product.imageUrl ? (
+                        <img
+                          src={`${product.imageUrl}?w=80&h=80&fit=crop`}
+                          alt=""
+                          className="h-10 w-10 shrink-0 rounded-md border border-border object-cover"
+                        />
+                      ) : (
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-border bg-muted text-xs text-muted-foreground">
+                          No img
+                        </div>
+                      )}
+                      <div className="font-medium text-foreground">{product.title}</div>
+                    </div>
                   </td>
                   <td className="px-4 py-3">
                     <PlatformBadges values={product.platforms} />
