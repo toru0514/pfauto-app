@@ -6,8 +6,8 @@ import { AddWoodModal, type AddWoodFormData } from "./add-wood-modal";
 import {
   addWoodAction,
   deleteWoodAction,
-  type WoodMaterial,
 } from "@/app/dashboard/woods/actions";
+import type { WoodMaterial } from "@/adapters/google-sheets/wood-repository";
 import { useToast } from "@/components/providers/toast-provider";
 
 type Props = {

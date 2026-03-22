@@ -5,10 +5,8 @@ import {
   listWoods,
   addWood,
   deleteWood,
-  type WoodMaterial,
 } from "@/adapters/google-sheets/wood-repository";
-
-export type { WoodMaterial };
+import type { WoodMaterial } from "@/adapters/google-sheets/wood-repository";
 
 export async function getWoods(): Promise<WoodMaterial[]> {
   return listWoods();
