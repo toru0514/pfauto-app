@@ -393,6 +393,7 @@ export class GoogleSheetsProductRepository implements ProductRepositoryPort {
       const fieldMapping: { aliases: string[]; value: string }[] = [
         { aliases: HEADER_ALIASES.productId, value: input.productId },
         { aliases: HEADER_ALIASES.title, value: input.title },
+        { aliases: HEADER_ALIASES.description, value: input.description ?? "" },
         { aliases: HEADER_ALIASES.price, value: input.price !== null ? String(input.price) : "" },
         { aliases: HEADER_ALIASES.inventory, value: input.inventory !== null ? String(input.inventory) : "" },
         { aliases: HEADER_ALIASES.platforms, value: input.platforms.join(",") },

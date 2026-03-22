@@ -27,6 +27,7 @@ describe("addProductUseCase", () => {
       addProductUseCase({
         productId: "",
         title: "テスト商品",
+        description: "",
         price: 1000,
         inventory: 5,
         platforms: ["creema"],
@@ -39,6 +40,7 @@ describe("addProductUseCase", () => {
       addProductUseCase({
         productId: "   ",
         title: "テスト商品",
+        description: "",
         price: 1000,
         inventory: 5,
         platforms: ["creema"],
@@ -51,6 +53,7 @@ describe("addProductUseCase", () => {
       addProductUseCase({
         productId: "test-001",
         title: "",
+        description: "",
         price: 1000,
         inventory: 5,
         platforms: ["creema"],
@@ -63,6 +66,7 @@ describe("addProductUseCase", () => {
       addProductUseCase({
         productId: "test-001",
         title: "テスト商品",
+        description: "",
         price: 1000,
         inventory: 5,
         platforms: [],
@@ -75,6 +79,7 @@ describe("addProductUseCase", () => {
       addProductUseCase({
         productId: "test-001",
         title: "テスト商品",
+        description: "",
         price: 1000,
         inventory: 5,
         platforms: ["", " "],
@@ -103,6 +108,7 @@ describe("addProductUseCase", () => {
       addProductUseCase({
         productId: "test-001",
         title: "テスト商品",
+        description: "",
         price: 1000,
         inventory: 5,
         platforms: ["creema"],
@@ -114,6 +120,7 @@ describe("addProductUseCase", () => {
     await addProductUseCase({
       productId: " test-001 ",
       title: " テスト商品 ",
+      description: " テスト説明 ",
       price: 3500,
       inventory: 10,
       platforms: ["Creema", " Minne "],
@@ -123,6 +130,7 @@ describe("addProductUseCase", () => {
     expect(mockAddProduct).toHaveBeenCalledWith({
       productId: "test-001",
       title: "テスト商品",
+      description: "テスト説明",
       price: 3500,
       inventory: 10,
       platforms: ["creema", "minne"],
@@ -133,6 +141,7 @@ describe("addProductUseCase", () => {
     await addProductUseCase({
       productId: "test-002",
       title: "テスト商品2",
+      description: "",
       price: null,
       inventory: null,
       platforms: ["base"],
@@ -141,6 +150,7 @@ describe("addProductUseCase", () => {
     expect(mockAddProduct).toHaveBeenCalledWith({
       productId: "test-002",
       title: "テスト商品2",
+      description: "",
       price: null,
       inventory: null,
       platforms: ["base"],
@@ -151,6 +161,7 @@ describe("addProductUseCase", () => {
     await addProductUseCase({
       productId: " test-003 ",
       title: "テスト",
+      description: "",
       price: null,
       inventory: null,
       platforms: ["iichi"],
