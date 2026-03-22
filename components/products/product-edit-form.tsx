@@ -124,24 +124,14 @@ export function ProductEditForm({ productId }: Props) {
             <p className="text-sm text-muted-foreground">ID: {productId}</p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => router.push("/dashboard")}
-            disabled={pendingSave}
-            className="rounded-md border border-border px-4 py-2 text-sm font-medium text-muted-foreground transition hover:bg-muted disabled:opacity-60"
-          >
-            戻る
-          </button>
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={pendingSave || !hasChanges}
-            className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {pendingSave ? "保存中..." : "保存"}
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={handleSave}
+          disabled={pendingSave || !hasChanges}
+          className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {pendingSave ? "保存中..." : "保存"}
+        </button>
       </div>
 
       {/* Messages */}

@@ -9,11 +9,5 @@ type Props = {
 export default async function ProductEditPage({ params }: Props) {
   const { id } = await params;
 
-  return (
-    <main className="min-h-screen bg-background px-4 py-8">
-      <div className="mx-auto max-w-4xl">
-        <ProductEditForm productId={decodeURIComponent(id)} />
-      </div>
-    </main>
-  );
+  return <ProductEditForm productId={decodeURIComponent(id)} />;
 }

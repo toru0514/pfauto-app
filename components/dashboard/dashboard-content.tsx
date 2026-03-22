@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ExternalLink, Copy, Pencil } from "lucide-react";
+import { Copy, Pencil } from "lucide-react";
 import {
   addProduct,
   enqueueDraft,
@@ -149,24 +149,6 @@ export function DashboardContent({ products, jobs, spreadsheetUrl }: Props) {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => router.push("/dashboard/jobs")}
-            className="rounded-md border border-border bg-background px-3 py-2 text-sm font-semibold text-foreground transition hover:bg-muted"
-          >
-            ジョブ一覧
-          </button>
-          {spreadsheetUrl && (
-            <a
-              href={spreadsheetUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-3 py-2 text-sm font-semibold text-foreground transition hover:bg-muted"
-            >
-              <ExternalLink className="h-4 w-4" />
-              スプレッドシートを開く
-            </a>
-          )}
           <button
             type="button"
             onClick={() => setShowAddProductModal(true)}
@@ -584,19 +566,11 @@ function renderOperationLabel(type: OperationLogEntry["type"]) {
 export function JobsContent({ jobs }: JobsContentProps) {
   return (
     <div className="space-y-8">
-      <header className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold text-foreground">ジョブステータス</h1>
-          <p className="text-sm text-muted-foreground">
-            各プラットフォームへの出品ジョブの状況を確認できます。
-          </p>
-        </div>
-        <a
-          href="/dashboard"
-          className="rounded-md border border-border bg-background px-3 py-2 text-sm font-semibold text-foreground transition hover:bg-muted"
-        >
-          商品一覧に戻る
-        </a>
+      <header>
+        <h1 className="text-2xl font-semibold text-foreground">ジョブステータス</h1>
+        <p className="text-sm text-muted-foreground">
+          各プラットフォームへの出品ジョブの状況を確認できます。
+        </p>
       </header>
 
       <section className="overflow-hidden rounded-lg border border-border bg-card shadow-sm">

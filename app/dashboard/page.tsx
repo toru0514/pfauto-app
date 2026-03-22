@@ -10,10 +10,6 @@ export default async function DashboardPage() {
   ]);
 
   return (
-    <main className="min-h-screen bg-background px-4 py-8">
-      <div className="mx-auto max-w-6xl">
-        <DashboardContent products={products} jobs={jobs} spreadsheetUrl={spreadsheetUrl} />
-      </div>
-    </main>
+    <DashboardContent products={products} jobs={jobs} spreadsheetUrl={spreadsheetUrl} />
   );
 }
