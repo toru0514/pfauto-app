@@ -20,7 +20,6 @@ export function ProductEditForm({ productId }: Props) {
   const router = useRouter();
   const [raw, setRaw] = useState<Record<string, string> | null>(null);
   const [initialRaw, setInitialRaw] = useState<Record<string, string> | null>(null);
-  const [platforms, setPlatforms] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -36,7 +35,6 @@ export function ProductEditForm({ productId }: Props) {
       const detail = await getProductDetail(productId);
       setRaw({ ...detail.raw });
       setInitialRaw({ ...detail.raw });
-      setPlatforms(detail.platforms);
     } catch (e) {
       setError(e instanceof Error ? e.message : "読み込みに失敗しました");
     } finally {
@@ -90,19 +88,11 @@ export function ProductEditForm({ productId }: Props) {
     });
   };
 
-  const shouldShowSection = (section: FieldSection): boolean => {
-    if (section === "basic") return true;
-    if (section === "base") return platforms.includes("base");
-    return platforms.includes(section);
-  };
-
   const allFields = raw
     ? [...FIELD_CONFIGS, ...getExtraFields(raw)]
     : FIELD_CONFIGS;
 
-  const sections = (
-    ["basic", "creema", "minne", "iichi", "base"] as FieldSection[]
-  ).filter(shouldShowSection);
+  const sections: FieldSection[] = ["basic", "creema", "minne", "iichi", "base"];
 
   const hasChanges =
     raw &&
