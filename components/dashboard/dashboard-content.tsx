@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Copy, Pencil } from "lucide-react";
+import { Copy, ExternalLink, Pencil } from "lucide-react";
 import {
   addProduct,
   enqueueDraft,
@@ -149,6 +149,17 @@ export function DashboardContent({ products, jobs, spreadsheetUrl }: Props) {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {spreadsheetUrl && (
+            <a
+              href={spreadsheetUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-3 py-2 text-sm font-semibold text-foreground transition hover:bg-muted"
+            >
+              <ExternalLink className="h-4 w-4" />
+              スプレッドシートを開く
+            </a>
+          )}
           <button
             type="button"
             onClick={() => setShowAddProductModal(true)}
