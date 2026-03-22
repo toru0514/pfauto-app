@@ -25,16 +25,12 @@ type Props = {
 };
 
 export function AddProductModal({ pending, onSubmit, onClose }: Props) {
-  const [productId, setProductId] = useState("");
+  const [productId] = useState(() => `prod-${Date.now()}`);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [priceText, setPriceText] = useState("");
   const [inventoryText, setInventoryText] = useState("");
   const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([]);
-
-  const generateId = () => {
-    setProductId(`prod-${Date.now()}`);
-  };
 
   const togglePlatform = (value: string) => {
     setSelectedPlatforms((prev) =>
@@ -56,7 +52,6 @@ export function AddProductModal({ pending, onSubmit, onClose }: Props) {
 
   const canSubmit =
     !pending &&
-    productId.trim().length > 0 &&
     title.trim().length > 0 &&
     selectedPlatforms.length > 0 &&
     !priceError &&
@@ -100,30 +95,6 @@ export function AddProductModal({ pending, onSubmit, onClose }: Props) {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4 px-4 py-4">
-          <div>
-            <label className="block text-xs font-medium text-muted-foreground mb-1">
-              商品ID <span className="text-destructive">*</span>
-            </label>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={productId}
-                onChange={(e) => setProductId(e.target.value)}
-                placeholder="例: ring-001"
-                disabled={pending}
-                className="flex-1 rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 disabled:opacity-60"
-              />
-              <button
-                type="button"
-                onClick={generateId}
-                disabled={pending}
-                className="shrink-0 rounded-md border border-border bg-muted px-3 py-2 text-xs font-medium text-muted-foreground transition hover:bg-muted/80 disabled:opacity-60"
-              >
-                自動生成
-              </button>
-            </div>
-          </div>
-
           <div>
             <label className="block text-xs font-medium text-muted-foreground mb-1">
               商品名 <span className="text-destructive">*</span>

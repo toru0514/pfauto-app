@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ExternalLink, Copy } from "lucide-react";
+import { ExternalLink, Copy, Pencil } from "lucide-react";
 import {
   addProduct,
   enqueueDraft,
@@ -215,6 +215,13 @@ export function DashboardContent({ products, jobs, spreadsheetUrl }: Props) {
                   </td>
                   <td className="px-4 py-3 text-right">
                     <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        className="rounded-md border border-border px-3 py-2 text-xs font-medium text-foreground transition hover:bg-muted"
+                        onClick={() => router.push(`/dashboard/products/${encodeURIComponent(product.id)}`)}
+                        title="編集"
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </button>
                       <button
                         className="rounded-md border border-border px-3 py-2 text-xs font-medium text-foreground transition hover:bg-muted"
                         onClick={() => setCopyingProductId(product.id)}

@@ -130,6 +130,42 @@ export async function getFieldOptions(
   return result;
 }
 
+export type MicroCmsImage = {
+  id: string;
+  url: string;
+  width: number;
+  height: number;
+};
+
+export async function fetchMicroCmsImages(
+  offset: number = 0,
+  limit: number = 20
+): Promise<{ images: MicroCmsImage[]; totalCount: number }> {
+  const domain = process.env.MICROCMS_SERVICE_DOMAIN;
+  const apiKey = process.env.MICROCMS_API_KEY;
+  if (!domain || !apiKey) {
+    throw new Error("microCMSの環境変数が設定されていません。");
+  }
+
+  const res = await fetch(
+    `https://${domain}.microcms-management.io/api/v1/media?limit=${limit}&offset=${offset}`,
+    { headers: { "X-MICROCMS-API-KEY": apiKey }, cache: "no-store" }
+  );
+  if (!res.ok) {
+    throw new Error(`microCMS API エラー: ${res.status}`);
+  }
+  const data = await res.json();
+  return {
+    images: (data.media ?? []).map((m: Record<string, unknown>) => ({
+      id: m.id as string,
+      url: m.url as string,
+      width: m.width as number,
+      height: m.height as number,
+    })),
+    totalCount: data.totalCount as number,
+  };
+}
+
 export async function getSpreadsheetUrl(): Promise<string | null> {
   const spreadsheetId = process.env.GOOGLE_SHEETS_SPREADSHEET_ID;
   if (!spreadsheetId) return null;

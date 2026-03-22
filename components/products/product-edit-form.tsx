@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronDown, ChevronRight, ArrowLeft } from "lucide-react";
+import { ChevronDown, ChevronRight, ArrowLeft, ImagePlus } from "lucide-react";
 import { getProductDetail, updateProduct, getFieldOptions } from "@/app/dashboard/actions";
+import { ImagePickerDialog } from "./image-picker-dialog";
 import {
   FIELD_CONFIGS,
   SECTION_LABELS,
@@ -29,6 +30,7 @@ export function ProductEditForm({ productId }: Props) {
   const [collapsedSections, setCollapsedSections] = useState<Set<FieldSection>>(
     new Set()
   );
+  const [showImagePicker, setShowImagePicker] = useState(false);
 
   const loadProduct = useCallback(async () => {
     setLoading(true);
@@ -203,6 +205,11 @@ export function ProductEditForm({ productId }: Props) {
                         onChange={(v) => handleFieldChange(field.key, v)}
                         disabled={pendingSave}
                         options={fieldOptions[field.key]}
+                        onPickImages={
+                          field.key === "image_urls"
+                            ? () => setShowImagePicker(true)
+                            : undefined
+                        }
                       />
                     ))}
                   </div>
@@ -211,6 +218,18 @@ export function ProductEditForm({ productId }: Props) {
             );
           })}
         </div>
+      )}
+
+      {/* Image picker dialog */}
+      {showImagePicker && (
+        <ImagePickerDialog
+          currentUrls={(raw?.["image_urls"] ?? "").split(",").map((s) => s.trim()).filter(Boolean)}
+          onConfirm={(urls) => {
+            handleFieldChange("image_urls", urls.join(","));
+            setShowImagePicker(false);
+          }}
+          onClose={() => setShowImagePicker(false)}
+        />
       )}
 
       {/* Bottom save bar */}
@@ -239,12 +258,14 @@ function FieldInput({
   onChange,
   disabled,
   options,
+  onPickImages,
 }: {
   field: FieldConfig;
   value: string;
   onChange: (value: string) => void;
   disabled: boolean;
   options?: string[];
+  onPickImages?: () => void;
 }) {
   const isReadOnly = field.key === "product_id";
   const isWide = field.type === "textarea";
@@ -254,18 +275,43 @@ function FieldInput({
   if (field.type === "textarea") {
     return (
       <div className={wrapperClass}>
-        <label className="block text-xs font-medium text-muted-foreground mb-1">
-          {field.label}
-        </label>
+        <div className="flex items-center justify-between mb-1">
+          <label className="block text-xs font-medium text-muted-foreground">
+            {field.label}
+          </label>
+          {onPickImages && (
+            <button
+              type="button"
+              onClick={onPickImages}
+              disabled={disabled}
+              className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs font-medium text-muted-foreground transition hover:bg-muted disabled:opacity-60"
+            >
+              <ImagePlus className="h-3.5 w-3.5" />
+              microCMSから選択
+            </button>
+          )}
+        </div>
         <textarea
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder={field.placeholder}
           disabled={disabled}
           readOnly={isReadOnly}
-          rows={3}
+          rows={field.key === "description" ? 12 : 4}
           className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 disabled:opacity-60 read-only:bg-muted/50 resize-y"
         />
+        {field.key === "image_urls" && value && (
+          <div className="mt-2 flex flex-wrap gap-2">
+            {value.split(",").map((url) => url.trim()).filter(Boolean).map((url, i) => (
+              <img
+                key={i}
+                src={`${url}?w=80&h=80&fit=crop`}
+                alt=""
+                className="h-16 w-16 rounded-md border border-border object-cover"
+              />
+            ))}
+          </div>
+        )}
       </div>
     );
   }
