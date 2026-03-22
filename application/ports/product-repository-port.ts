@@ -4,6 +4,7 @@ import type { SpreadsheetProductRecord } from "@/application/types/product";
 export type AddProductInput = {
   productId: string;
   title: string;
+  description: string;
   price: number | null;
   inventory: number | null;
   platforms: string[];

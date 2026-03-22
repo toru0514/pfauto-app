@@ -46,10 +46,12 @@ export async function addProduct(input: unknown) {
   const raw = input as Record<string, unknown>;
   const price = raw.price === null || typeof raw.price === "number" ? (raw.price as number | null) : null;
   const inventory = raw.inventory === null || typeof raw.inventory === "number" ? (raw.inventory as number | null) : null;
+  const description = typeof raw.description === "string" ? raw.description : "";
 
   await addProductUseCase({
     productId: raw.productId as string,
     title: raw.title as string,
+    description,
     price,
     inventory,
     platforms: raw.platforms as string[],

@@ -75,6 +75,7 @@ export async function enqueueDraftUseCase(
 export async function addProductUseCase(input: {
   productId: string;
   title: string;
+  description: string;
   price: number | null;
   inventory: number | null;
   platforms: string[];
@@ -104,6 +105,7 @@ export async function addProductUseCase(input: {
   await googleSheetsProductRepository.addProduct({
     productId: input.productId.trim(),
     title: input.title.trim(),
+    description: input.description.trim(),
     price: input.price,
     inventory: input.inventory,
     platforms: normalizedPlatforms,

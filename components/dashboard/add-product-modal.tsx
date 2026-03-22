@@ -12,6 +12,7 @@ const AVAILABLE_PLATFORMS = [
 export type AddProductFormData = {
   productId: string;
   title: string;
+  description: string;
   price: number | null;
   inventory: number | null;
   platforms: string[];
@@ -26,6 +27,7 @@ type Props = {
 export function AddProductModal({ pending, onSubmit, onClose }: Props) {
   const [productId, setProductId] = useState("");
   const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
   const [priceText, setPriceText] = useState("");
   const [inventoryText, setInventoryText] = useState("");
   const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([]);
@@ -70,6 +72,7 @@ export function AddProductModal({ pending, onSubmit, onClose }: Props) {
     onSubmit({
       productId: productId.trim(),
       title: title.trim(),
+      description: description.trim(),
       price: price !== null && Number.isFinite(price) ? price : null,
       inventory: inventory !== null && Number.isFinite(inventory) ? inventory : null,
       platforms: selectedPlatforms,
@@ -132,6 +135,20 @@ export function AddProductModal({ pending, onSubmit, onClose }: Props) {
               placeholder="例: シルバーリング"
               disabled={pending}
               className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 disabled:opacity-60"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-muted-foreground mb-1">
+              商品説明
+            </label>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="商品の説明を入力"
+              disabled={pending}
+              rows={3}
+              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 disabled:opacity-60 resize-y"
             />
           </div>
 
