@@ -66,6 +66,7 @@ export async function addProduct(input: unknown) {
   revalidatePath("/");
 }
 
+<<<<<<< HEAD
 export type ProductDetail = SpreadsheetProductRecord;
 
 export async function getProductDetail(
@@ -164,6 +165,41 @@ export async function fetchMicroCmsImages(
     })),
     totalCount: data.totalCount as number,
   };
+}
+
+export async function uploadImageToMicroCms(
+  formData: FormData
+): Promise<{ url: string } | { error: string }> {
+  const domain = process.env.MICROCMS_SERVICE_DOMAIN;
+  const apiKey = process.env.MICROCMS_API_KEY;
+  if (!domain || !apiKey) {
+    return { error: "microCMSの環境変数が設定されていません。" };
+  }
+
+  const file = formData.get("file");
+  if (!file || !(file instanceof File)) {
+    return { error: "ファイルが選択されていません。" };
+  }
+
+  const uploadForm = new FormData();
+  uploadForm.append("file", file);
+
+  const res = await fetch(
+    `https://${domain}.microcms-management.io/api/v1/media`,
+    {
+      method: "POST",
+      headers: { "X-MICROCMS-API-KEY": apiKey },
+      body: uploadForm,
+    }
+  );
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    return { error: `microCMS APIエラー: ${res.status} ${text}` };
+  }
+
+  const data = await res.json();
+  return { url: data.url as string };
 }
 
 export async function getSpreadsheetUrl(): Promise<string | null> {

@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Package, Briefcase, ExternalLink } from "lucide-react";
+import { Package, Briefcase, ImagePlus, ExternalLink } from "lucide-react";
 
 const NAV_ITEMS = [
   { href: "/dashboard", label: "商品一覧", icon: Package },
   { href: "/dashboard/jobs", label: "ジョブ一覧", icon: Briefcase },
+  { href: "/dashboard/images/upload", label: "画像追加", icon: ImagePlus },
 ];
 
 export function Sidebar({ spreadsheetUrl }: { spreadsheetUrl: string | null }) {
