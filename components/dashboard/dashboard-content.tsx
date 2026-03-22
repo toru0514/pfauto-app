@@ -20,6 +20,10 @@ type Props = {
   spreadsheetUrl: string | null;
 };
 
+export type JobsContentProps = {
+  jobs: JobRow[];
+};
+
 type DetailProduct = ProductRow & {
   jobHistory: JobRow[];
 };
@@ -145,6 +149,13 @@ export function DashboardContent({ products, jobs, spreadsheetUrl }: Props) {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => router.push("/dashboard/jobs")}
+            className="rounded-md border border-border bg-background px-3 py-2 text-sm font-semibold text-foreground transition hover:bg-muted"
+          >
+            ジョブ一覧
+          </button>
           {spreadsheetUrl && (
             <a
               href={spreadsheetUrl}
@@ -273,42 +284,6 @@ export function DashboardContent({ products, jobs, spreadsheetUrl }: Props) {
                         {pendingEnqueue ? "送信中..." : "送信"}
                       </button>
                     </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      <section className="overflow-hidden rounded-lg border border-border bg-card shadow-sm">
-        <div className="border-b border-border bg-muted/50 px-4 py-2 text-sm font-semibold text-muted-foreground">
-          ジョブステータス
-        </div>
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-border text-sm">
-            <thead className="bg-muted/30 text-muted-foreground">
-              <tr>
-                <th className="px-4 py-3 text-left font-medium">ジョブID</th>
-                <th className="px-4 py-3 text-left font-medium">商品</th>
-                <th className="px-4 py-3 text-left font-medium">プラットフォーム</th>
-                <th className="px-4 py-3 text-left font-medium">ステータス</th>
-                <th className="px-4 py-3 text-left font-medium">試行</th>
-                <th className="px-4 py-3 text-left font-medium">開始時刻</th>
-                <th className="px-4 py-3 text-left font-medium">所要時間</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {jobs.map((job) => (
-                <tr key={job.id} className="bg-card">
-                  <td className="px-4 py-3 font-medium text-foreground">{job.id}</td>
-                  <td className="px-4 py-3 text-sm text-muted-foreground">{job.productId}</td>
-                  <td className="px-4 py-3"><PlatformBadges values={[job.platform]} /></td>
-                  <td className="px-4 py-3"><JobStatusBadge status={job.status} /></td>
-                  <td className="px-4 py-3 text-sm text-muted-foreground">{job.attempt ?? "-"}</td>
-                  <td className="px-4 py-3 text-sm text-muted-foreground">{formatDate(job.startedAt)}</td>
-                  <td className="px-4 py-3 text-sm text-muted-foreground">
-                    {job.durationSeconds ? `${job.durationSeconds}s` : "-"}
                   </td>
                 </tr>
               ))}
@@ -604,4 +579,66 @@ function renderOperationLabel(type: OperationLogEntry["type"]) {
   if (type === "enqueue") return "送信キュー登録";
   if (type === "add") return "商品追加";
   return type;
+}
+
+export function JobsContent({ jobs }: JobsContentProps) {
+  return (
+    <div className="space-y-8">
+      <header className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold text-foreground">ジョブステータス</h1>
+          <p className="text-sm text-muted-foreground">
+            各プラットフォームへの出品ジョブの状況を確認できます。
+          </p>
+        </div>
+        <a
+          href="/dashboard"
+          className="rounded-md border border-border bg-background px-3 py-2 text-sm font-semibold text-foreground transition hover:bg-muted"
+        >
+          商品一覧に戻る
+        </a>
+      </header>
+
+      <section className="overflow-hidden rounded-lg border border-border bg-card shadow-sm">
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-border text-sm">
+            <thead className="bg-muted/30 text-muted-foreground">
+              <tr>
+                <th className="px-4 py-3 text-left font-medium">ジョブID</th>
+                <th className="px-4 py-3 text-left font-medium">商品</th>
+                <th className="px-4 py-3 text-left font-medium">プラットフォーム</th>
+                <th className="px-4 py-3 text-left font-medium">ステータス</th>
+                <th className="px-4 py-3 text-left font-medium">試行</th>
+                <th className="px-4 py-3 text-left font-medium">開始時刻</th>
+                <th className="px-4 py-3 text-left font-medium">所要時間</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {jobs.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="px-4 py-8 text-center text-sm text-muted-foreground">
+                    ジョブはまだありません。
+                  </td>
+                </tr>
+              ) : (
+                jobs.map((job) => (
+                  <tr key={job.id} className="bg-card">
+                    <td className="px-4 py-3 font-medium text-foreground">{job.id}</td>
+                    <td className="px-4 py-3 text-sm text-muted-foreground">{job.productId}</td>
+                    <td className="px-4 py-3"><PlatformBadges values={[job.platform]} /></td>
+                    <td className="px-4 py-3"><JobStatusBadge status={job.status} /></td>
+                    <td className="px-4 py-3 text-sm text-muted-foreground">{job.attempt ?? "-"}</td>
+                    <td className="px-4 py-3 text-sm text-muted-foreground">{formatDate(job.startedAt)}</td>
+                    <td className="px-4 py-3 text-sm text-muted-foreground">
+                      {job.durationSeconds ? `${job.durationSeconds}s` : "-"}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  );
 }

@@ -1,4 +1,4 @@
-export type FieldType = "text" | "textarea" | "number" | "select";
+export type FieldType = "text" | "textarea" | "number" | "select" | "platforms";
 
 export type FieldSection = "basic" | "creema" | "minne" | "base" | "iichi";
 
@@ -36,7 +36,7 @@ export const FIELD_CONFIGS: FieldConfig[] = [
   { key: "shipping_fee", label: "送料", type: "number", section: "basic", placeholder: "例: 300" },
   { key: "shipping_method", label: "配送方法", type: "select", section: "basic" },
   { key: "shipping_origin_pref", label: "発送元都道府県", type: "select", section: "basic" },
-  { key: "出品先", label: "出品先", type: "text", section: "basic", placeholder: "Creema,minne,BASE,iichi" },
+  { key: "出品先", label: "出品先", type: "platforms", section: "basic" },
   { key: "notes_internal", label: "内部メモ", type: "textarea", section: "basic" },
 
   // === Creema ===

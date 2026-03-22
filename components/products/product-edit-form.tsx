@@ -316,6 +316,51 @@ function FieldInput({
     );
   }
 
+  if (field.type === "platforms") {
+    const PLATFORM_OPTIONS = [
+      { value: "creema", label: "Creema" },
+      { value: "minne", label: "minne" },
+      { value: "base", label: "BASE" },
+      { value: "iichi", label: "iichi" },
+    ];
+    const selected = value
+      .split(",")
+      .map((s) => s.trim().toLowerCase())
+      .filter(Boolean);
+
+    const toggle = (pf: string) => {
+      const next = selected.includes(pf)
+        ? selected.filter((s) => s !== pf)
+        : [...selected, pf];
+      onChange(next.join(","));
+    };
+
+    return (
+      <div className="col-span-full">
+        <label className="block text-xs font-medium text-muted-foreground mb-2">
+          {field.label}
+        </label>
+        <div className="flex flex-wrap gap-3">
+          {PLATFORM_OPTIONS.map((pf) => (
+            <label
+              key={pf.value}
+              className="inline-flex cursor-pointer items-center gap-2"
+            >
+              <input
+                type="checkbox"
+                checked={selected.includes(pf.value)}
+                onChange={() => toggle(pf.value)}
+                disabled={disabled}
+                className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+              />
+              <span className="text-sm text-foreground">{pf.label}</span>
+            </label>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   if (field.type === "select" && options) {
     // 現在の値が選択肢にない場合も選べるように追加
     const allOptions = options.includes(value) || !value
