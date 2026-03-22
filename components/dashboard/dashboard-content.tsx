@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Copy, Pencil } from "lucide-react";
+import { Copy, ExternalLink, Pencil } from "lucide-react";
 import {
   addProduct,
   enqueueDraft,
@@ -36,6 +36,40 @@ type OperationLogEntry = {
   detail?: string;
   createdAt: number;
 };
+
+/** microCMS画像URLにリサイズパラメータを安全に付与する */
+function buildThumbnailSrc(raw: string): string {
+  try {
+    const url = new URL(raw);
+    url.searchParams.set("w", "80");
+    url.searchParams.set("h", "80");
+    url.searchParams.set("fit", "crop");
+    return url.toString();
+  } catch {
+    return raw;
+  }
+}
+
+function NoImagePlaceholder() {
+  return (
+    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-border bg-muted text-xs text-muted-foreground">
+      No img
+    </div>
+  );
+}
+
+function ProductThumbnail({ url }: { url: string }) {
+  const [failed, setFailed] = useState(false);
+  if (failed) return <NoImagePlaceholder />;
+  return (
+    <img
+      src={buildThumbnailSrc(url)}
+      alt=""
+      className="h-10 w-10 shrink-0 rounded-md border border-border object-cover"
+      onError={() => setFailed(true)}
+    />
+  );
+}
 
 export function DashboardContent({ products, jobs, spreadsheetUrl }: Props) {
   const router = useRouter();
@@ -149,6 +183,17 @@ export function DashboardContent({ products, jobs, spreadsheetUrl }: Props) {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {spreadsheetUrl && (
+            <a
+              href={spreadsheetUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-3 py-2 text-sm font-semibold text-foreground transition hover:bg-muted"
+            >
+              <ExternalLink className="h-4 w-4" />
+              スプレッドシートを開く
+            </a>
+          )}
           <button
             type="button"
             onClick={() => setShowAddProductModal(true)}
@@ -191,7 +236,14 @@ export function DashboardContent({ products, jobs, spreadsheetUrl }: Props) {
                   onClick={() => router.push(`/dashboard/products/${encodeURIComponent(product.id)}`)}
                 >
                   <td className="px-4 py-3">
-                    <div className="font-medium text-foreground">{product.title}</div>
+                    <div className="flex items-center gap-3">
+                      {product.imageUrl ? (
+                        <ProductThumbnail url={product.imageUrl} />
+                      ) : (
+                        <NoImagePlaceholder />
+                      )}
+                      <div className="font-medium text-foreground">{product.title}</div>
+                    </div>
                   </td>
                   <td className="px-4 py-3">
                     <PlatformBadges values={product.platforms} />
