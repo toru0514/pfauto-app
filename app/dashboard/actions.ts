@@ -106,6 +106,30 @@ export async function copyProduct(
   revalidatePath("/");
 }
 
+/**
+ * selectフィールドの選択肢を共通シートの既存データから取得する。
+ * キー: カラム名, 値: ユニーク値の配列
+ */
+export async function getFieldOptions(
+  keys: string[]
+): Promise<Record<string, string[]>> {
+  const { googleSheetsProductRepository } = await import(
+    "@/adapters/google-sheets/product-repository"
+  );
+  const products = await googleSheetsProductRepository.listProducts();
+
+  const result: Record<string, string[]> = {};
+  for (const key of keys) {
+    const values = new Set<string>();
+    for (const product of products) {
+      const v = (product.raw[key] ?? "").trim();
+      if (v) values.add(v);
+    }
+    result[key] = [...values].sort();
+  }
+  return result;
+}
+
 export async function getSpreadsheetUrl(): Promise<string | null> {
   const spreadsheetId = process.env.GOOGLE_SHEETS_SPREADSHEET_ID;
   if (!spreadsheetId) return null;

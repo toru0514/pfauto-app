@@ -1,4 +1,4 @@
-export type FieldType = "text" | "textarea" | "number";
+export type FieldType = "text" | "textarea" | "number" | "select";
 
 export type FieldSection = "basic" | "creema" | "minne" | "base" | "iichi";
 
@@ -34,26 +34,31 @@ export const FIELD_CONFIGS: FieldConfig[] = [
   { key: "image_urls", label: "画像URL", type: "textarea", section: "basic", placeholder: "カンマ区切りまたは1行に1URL" },
   { key: "production_lead_time_days", label: "制作日数", type: "number", section: "basic", placeholder: "例: 7" },
   { key: "shipping_fee", label: "送料", type: "number", section: "basic", placeholder: "例: 300" },
-  { key: "shipping_method", label: "配送方法", type: "text", section: "basic" },
-  { key: "shipping_origin_pref", label: "発送元都道府県", type: "text", section: "basic" },
+  { key: "shipping_method", label: "配送方法", type: "select", section: "basic" },
+  { key: "shipping_origin_pref", label: "発送元都道府県", type: "select", section: "basic" },
   { key: "出品先", label: "出品先", type: "text", section: "basic", placeholder: "Creema,minne,BASE,iichi" },
   { key: "notes_internal", label: "内部メモ", type: "textarea", section: "basic" },
 
   // === Creema ===
-  { key: "creema_category_level1_label", label: "カテゴリ(大)", type: "text", section: "creema" },
-  { key: "creema_category_level2_label", label: "カテゴリ(中)", type: "text", section: "creema" },
-  { key: "creema_category_level3_label", label: "カテゴリ(小)", type: "text", section: "creema" },
+  { key: "creema_category_level1_label", label: "カテゴリ(大)", type: "select", section: "creema" },
+  { key: "creema_category_level2_label", label: "カテゴリ(中)", type: "select", section: "creema" },
+  { key: "creema_category_level3_label", label: "カテゴリ(小)", type: "select", section: "creema" },
   { key: "creema_color_ids", label: "カラーID", type: "text", section: "creema" },
 
   // === minne ===
-  { key: "minne_category_parent_label", label: "カテゴリ(親)", type: "text", section: "minne" },
-  { key: "minne_category_label", label: "カテゴリ", type: "text", section: "minne" },
+  { key: "minne_category_parent_label", label: "カテゴリ(親)", type: "select", section: "minne" },
+  { key: "minne_category_label", label: "カテゴリ", type: "select", section: "minne" },
   { key: "minne_shipping_additional_fee", label: "追加送料", type: "number", section: "minne" },
 
   // === iichi ===
-  { key: "iichi_category_parent_label", label: "カテゴリ(親)", type: "text", section: "iichi" },
-  { key: "iichi_category_child_label", label: "カテゴリ(子)", type: "text", section: "iichi" },
+  { key: "iichi_category_parent_label", label: "カテゴリ(親)", type: "select", section: "iichi" },
+  { key: "iichi_category_child_label", label: "カテゴリ(子)", type: "select", section: "iichi" },
 ];
+
+/** selectフィールドのキー一覧（サーバー側で選択肢取得に使用） */
+export const SELECT_FIELD_KEYS = FIELD_CONFIGS
+  .filter((f) => f.type === "select")
+  .map((f) => f.key);
 
 /**
  * rawデータ内のキーのうち、FIELD_CONFIGSに定義されていないキーを

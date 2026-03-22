@@ -3,10 +3,11 @@
 import { useCallback, useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronDown, ChevronRight, ArrowLeft } from "lucide-react";
-import { getProductDetail, updateProduct } from "@/app/dashboard/actions";
+import { getProductDetail, updateProduct, getFieldOptions } from "@/app/dashboard/actions";
 import {
   FIELD_CONFIGS,
   SECTION_LABELS,
+  SELECT_FIELD_KEYS,
   getExtraFields,
   type FieldConfig,
   type FieldSection,
@@ -20,6 +21,7 @@ export function ProductEditForm({ productId }: Props) {
   const router = useRouter();
   const [raw, setRaw] = useState<Record<string, string> | null>(null);
   const [initialRaw, setInitialRaw] = useState<Record<string, string> | null>(null);
+  const [fieldOptions, setFieldOptions] = useState<Record<string, string[]>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -32,9 +34,13 @@ export function ProductEditForm({ productId }: Props) {
     setLoading(true);
     setError(null);
     try {
-      const detail = await getProductDetail(productId);
+      const [detail, options] = await Promise.all([
+        getProductDetail(productId),
+        getFieldOptions(SELECT_FIELD_KEYS),
+      ]);
       setRaw({ ...detail.raw });
       setInitialRaw({ ...detail.raw });
+      setFieldOptions(options);
     } catch (e) {
       setError(e instanceof Error ? e.message : "読み込みに失敗しました");
     } finally {
@@ -196,6 +202,7 @@ export function ProductEditForm({ productId }: Props) {
                         value={raw[field.key] ?? ""}
                         onChange={(v) => handleFieldChange(field.key, v)}
                         disabled={pendingSave}
+                        options={fieldOptions[field.key]}
                       />
                     ))}
                   </div>
@@ -231,11 +238,13 @@ function FieldInput({
   value,
   onChange,
   disabled,
+  options,
 }: {
   field: FieldConfig;
   value: string;
   onChange: (value: string) => void;
   disabled: boolean;
+  options?: string[];
 }) {
   const isReadOnly = field.key === "product_id";
   const isWide = field.type === "textarea";
@@ -257,6 +266,34 @@ function FieldInput({
           rows={3}
           className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 disabled:opacity-60 read-only:bg-muted/50 resize-y"
         />
+      </div>
+    );
+  }
+
+  if (field.type === "select" && options) {
+    // 現在の値が選択肢にない場合も選べるように追加
+    const allOptions = options.includes(value) || !value
+      ? options
+      : [value, ...options];
+
+    return (
+      <div className={wrapperClass}>
+        <label className="block text-xs font-medium text-muted-foreground mb-1">
+          {field.label}
+        </label>
+        <select
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          disabled={disabled}
+          className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground disabled:opacity-60"
+        >
+          <option value="">-- 選択してください --</option>
+          {allOptions.map((opt) => (
+            <option key={opt} value={opt}>
+              {opt}
+            </option>
+          ))}
+        </select>
       </div>
     );
   }
