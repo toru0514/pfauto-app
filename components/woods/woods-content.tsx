@@ -1,12 +1,11 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Trash2 } from "lucide-react";
-import { AddWoodModal, type AddWoodFormData } from "./add-wood-modal";
-import {
-  addWoodAction,
-  deleteWoodAction,
-} from "@/app/dashboard/woods/actions";
+import Link from "next/link";
+import { Trash2, Pencil } from "lucide-react";
+import { WoodFormModal, type WoodFormData } from "./wood-form-modal";
+import { useWoodEdit, useWoodDelete } from "./use-wood-actions";
+import { addWoodAction } from "@/app/dashboard/woods/actions";
 import type { WoodMaterial } from "@/adapters/google-sheets/wood-repository";
 import { useToast } from "@/components/providers/toast-provider";
 
@@ -16,12 +15,18 @@ type Props = {
 
 export function WoodsContent({ woods }: Props) {
   const [showAddModal, setShowAddModal] = useState(false);
+  const [editingWood, setEditingWood] = useState<WoodMaterial | null>(null);
   const [pendingAdd, startAdd] = useTransition();
-  const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [, startDelete] = useTransition();
   const { showToast } = useToast();
 
-  const handleAdd = (data: AddWoodFormData) => {
+  const { handleEdit: onEdit, pending: pendingEdit } = useWoodEdit(
+    editingWood?.id ?? "",
+    () => setEditingWood(null)
+  );
+
+  const { handleDelete, pending: deletePending } = useWoodDelete();
+
+  const handleAdd = (data: WoodFormData) => {
     startAdd(async () => {
       try {
         await addWoodAction({
@@ -41,30 +46,6 @@ export function WoodsContent({ woods }: Props) {
           description: error instanceof Error ? error.message : "不明なエラー",
           variant: "error",
         });
-      }
-    });
-  };
-
-  const handleDelete = (id: string, name: string) => {
-    if (!window.confirm(`「${name}」を削除しますか？`)) return;
-
-    setDeletingId(id);
-    startDelete(async () => {
-      try {
-        await deleteWoodAction(id);
-        showToast({
-          title: "木材を削除しました",
-          description: name,
-          variant: "info",
-        });
-      } catch (error) {
-        showToast({
-          title: "木材の削除に失敗しました",
-          description: error instanceof Error ? error.message : "不明なエラー",
-          variant: "error",
-        });
-      } finally {
-        setDeletingId(null);
       }
     });
   };
@@ -100,40 +81,55 @@ export function WoodsContent({ woods }: Props) {
               key={wood.id}
               className="group overflow-hidden rounded-lg border border-border bg-card shadow-sm transition hover:shadow-md"
             >
-              {wood.imageUrl ? (
-                <div className="aspect-[4/3] overflow-hidden bg-muted">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={wood.imageUrl}
-                    alt={wood.name}
-                    className="h-full w-full object-cover"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).style.display = "none";
-                    }}
-                  />
-                </div>
-              ) : (
-                <div className="flex aspect-[4/3] items-center justify-center bg-muted">
-                  <span className="text-xs text-muted-foreground">画像なし</span>
-                </div>
-              )}
+              <Link href={`/dashboard/woods/${encodeURIComponent(wood.id)}`}>
+                {wood.imageUrl ? (
+                  <div className="aspect-[4/3] overflow-hidden bg-muted">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={wood.imageUrl}
+                      alt={wood.name}
+                      className="h-full w-full object-cover"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = "none";
+                      }}
+                    />
+                  </div>
+                ) : (
+                  <div className="flex aspect-[4/3] items-center justify-center bg-muted">
+                    <span className="text-xs text-muted-foreground">画像なし</span>
+                  </div>
+                )}
+              </Link>
               <div className="p-4">
                 <div className="flex items-start justify-between gap-2">
-                  <h3 className="text-base font-semibold text-foreground">
-                    {wood.name}
-                  </h3>
-                  <button
-                    type="button"
-                    onClick={() => handleDelete(wood.id, wood.name)}
-                    disabled={deletingId === wood.id}
-                    className="shrink-0 rounded-md p-1 text-muted-foreground opacity-0 transition hover:bg-muted hover:text-destructive group-hover:opacity-100 disabled:opacity-60"
-                    title="削除"
+                  <Link
+                    href={`/dashboard/woods/${encodeURIComponent(wood.id)}`}
+                    className="text-base font-semibold text-foreground hover:underline"
                   >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
+                    {wood.name}
+                  </Link>
+                  <div className="flex shrink-0 gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setEditingWood(wood)}
+                      className="rounded-md p-1 text-muted-foreground opacity-0 transition hover:bg-muted hover:text-foreground group-hover:opacity-100"
+                      title="編集"
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(wood.id, wood.name)}
+                      disabled={deletePending}
+                      className="rounded-md p-1 text-muted-foreground opacity-0 transition hover:bg-muted hover:text-destructive group-hover:opacity-100 disabled:opacity-60"
+                      title="削除"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
                 </div>
                 {wood.features && (
-                  <p className="mt-2 text-sm leading-relaxed text-muted-foreground whitespace-pre-wrap">
+                  <p className="mt-2 text-sm leading-relaxed text-muted-foreground whitespace-pre-wrap line-clamp-3">
                     {wood.features}
                   </p>
                 )}
@@ -144,10 +140,23 @@ export function WoodsContent({ woods }: Props) {
       )}
 
       {showAddModal && (
-        <AddWoodModal
+        <WoodFormModal
           pending={pendingAdd}
           onSubmit={handleAdd}
           onClose={() => setShowAddModal(false)}
+        />
+      )}
+
+      {editingWood && (
+        <WoodFormModal
+          pending={pendingEdit}
+          onSubmit={onEdit}
+          onClose={() => setEditingWood(null)}
+          initialData={{
+            name: editingWood.name,
+            imageUrl: editingWood.imageUrl,
+            features: editingWood.features,
+          }}
         />
       )}
     </div>
