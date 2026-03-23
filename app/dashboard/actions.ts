@@ -10,6 +10,10 @@ import {
   type DashboardProduct,
 } from "@/application/usecases/dashboard";
 import {
+  syncSheetsToDbUseCase,
+  type SyncResult,
+} from "@/application/usecases/sync-to-db";
+import {
   getProductDetailUseCase,
   updateProductUseCase,
   copyProductUseCase,
@@ -23,10 +27,20 @@ export async function getDashboardData() {
   return getDashboardSnapshotUseCase();
 }
 
-export async function refreshProductsFromSheets() {
+export async function refreshProductsFromSheets(): Promise<SyncResult | null> {
   await refreshProductsFromSheetsUseCase();
+
+  // スプシ読み込みと同時に DB にも同期
+  let syncResult: SyncResult | null = null;
+  try {
+    syncResult = await syncSheetsToDbUseCase();
+  } catch {
+    // DB 同期失敗はスプシ更新に影響させない
+  }
+
   revalidatePath("/dashboard");
   revalidatePath("/");
+  return syncResult;
 }
 
 export async function enqueueDraft(productId: string, platforms: string[]) {
@@ -113,8 +127,8 @@ export async function copyProduct(
 export async function getFieldOptions(
   keys: string[]
 ): Promise<Record<string, string[]>> {
-  const { googleSheetsProductRepository } = await import(
-    "@/adapters/google-sheets/product-repository"
+  const { dualWriteProductRepository: googleSheetsProductRepository } = await import(
+    "@/adapters/dual-write/product-repository"
   );
   const products = await googleSheetsProductRepository.listProducts();
 

@@ -7,7 +7,7 @@ import {
   addWood,
   updateWood,
   deleteWood,
-} from "@/adapters/google-sheets/wood-repository";
+} from "@/adapters/dual-write/wood-repository";
 import type { WoodMaterial } from "@/adapters/google-sheets/wood-repository";
 
 export async function getWoods(): Promise<WoodMaterial[]> {

@@ -1,4 +1,4 @@
-import { googleSheetsProductRepository } from "@/adapters/google-sheets/product-repository";
+import { dualWriteProductRepository as googleSheetsProductRepository } from "@/adapters/dual-write/product-repository";
 import type { SpreadsheetProductRecord } from "@/application/types/product";
 import type { JobStatus, ProductStatus } from "@/application/types/status";
 
