@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { Menu, X, Package, Briefcase, ImagePlus, TreePine, ExternalLink } from "lucide-react";
@@ -15,14 +15,8 @@ const NAV_ITEMS = [
 export function MobileHeader({ spreadsheetUrl }: { spreadsheetUrl: string | null }) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
-  const prevPathname = useRef(pathname);
 
-  if (prevPathname.current !== pathname) {
-    prevPathname.current = pathname;
-    if (open) {
-      setOpen(false);
-    }
-  }
+  const close = () => setOpen(false);
 
   useEffect(() => {
     if (open) {
@@ -55,17 +49,17 @@ export function MobileHeader({ spreadsheetUrl }: { spreadsheetUrl: string | null
       {open && (
         <div className="fixed inset-0 z-50 md:hidden">
           {/* Backdrop */}
-          <div className="absolute inset-0 bg-black/40" onClick={() => setOpen(false)} />
+          <div className="absolute inset-0 bg-black/40" onClick={close} />
 
           {/* Sidebar panel */}
           <aside className="absolute left-0 top-0 flex h-full w-52 flex-col border-r border-border bg-card">
             {/* Header with close button */}
             <div className="flex items-center justify-between border-b border-border px-4 py-4">
-              <Link href="/dashboard" className="text-sm font-bold text-foreground">
+              <Link href="/dashboard" onClick={close} className="text-sm font-bold text-foreground">
                 Sync Hub
               </Link>
               <button
-                onClick={() => setOpen(false)}
+                onClick={close}
                 className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
                 aria-label="メニューを閉じる"
               >
@@ -85,6 +79,7 @@ export function MobileHeader({ spreadsheetUrl }: { spreadsheetUrl: string | null
                   <Link
                     key={item.href}
                     href={item.href}
+                    onClick={close}
                     className={`flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition ${
                       isActive
                         ? "bg-primary/10 text-primary"
