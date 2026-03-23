@@ -4,7 +4,7 @@ import { useState } from "react";
 import { ImagePlus } from "lucide-react";
 import { ImagePickerDialog } from "@/components/products/image-picker-dialog";
 
-export type AddWoodFormData = {
+export type WoodFormData = {
   name: string;
   imageUrl: string;
   features: string;
@@ -12,12 +12,12 @@ export type AddWoodFormData = {
 
 type Props = {
   pending: boolean;
-  onSubmit: (data: AddWoodFormData) => void;
+  onSubmit: (data: WoodFormData) => void;
   onClose: () => void;
-  initialData?: AddWoodFormData;
+  initialData?: WoodFormData;
 };
 
-export function AddWoodModal({ pending, onSubmit, onClose, initialData }: Props) {
+export function WoodFormModal({ pending, onSubmit, onClose, initialData }: Props) {
   const [name, setName] = useState(initialData?.name ?? "");
   const [imageUrl, setImageUrl] = useState(initialData?.imageUrl ?? "");
   const [features, setFeatures] = useState(initialData?.features ?? "");

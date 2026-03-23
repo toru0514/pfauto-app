@@ -112,6 +112,13 @@ export async function listWoods(): Promise<WoodMaterial[]> {
   }
 }
 
+export async function findWoodById(
+  woodId: string
+): Promise<WoodMaterial | null> {
+  const woods = await listWoods();
+  return woods.find((w) => w.id === woodId) ?? null;
+}
+
 export async function addWood(input: {
   name: string;
   imageUrl: string;

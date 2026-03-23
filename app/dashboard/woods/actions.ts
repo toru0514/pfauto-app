@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import {
   listWoods,
+  findWoodById,
   addWood,
   updateWood,
   deleteWood,
@@ -11,6 +12,12 @@ import type { WoodMaterial } from "@/adapters/google-sheets/wood-repository";
 
 export async function getWoods(): Promise<WoodMaterial[]> {
   return listWoods();
+}
+
+export async function getWoodById(
+  woodId: string
+): Promise<WoodMaterial | null> {
+  return findWoodById(woodId);
 }
 
 export async function addWoodAction(input: {

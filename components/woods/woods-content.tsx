@@ -3,12 +3,9 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { Trash2, Pencil } from "lucide-react";
-import { AddWoodModal, type AddWoodFormData } from "./add-wood-modal";
-import {
-  addWoodAction,
-  updateWoodAction,
-  deleteWoodAction,
-} from "@/app/dashboard/woods/actions";
+import { WoodFormModal, type WoodFormData } from "./wood-form-modal";
+import { useWoodEdit, useWoodDelete } from "./use-wood-actions";
+import { addWoodAction } from "@/app/dashboard/woods/actions";
 import type { WoodMaterial } from "@/adapters/google-sheets/wood-repository";
 import { useToast } from "@/components/providers/toast-provider";
 
@@ -20,12 +17,16 @@ export function WoodsContent({ woods }: Props) {
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingWood, setEditingWood] = useState<WoodMaterial | null>(null);
   const [pendingAdd, startAdd] = useTransition();
-  const [pendingEdit, startEdit] = useTransition();
-  const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [, startDelete] = useTransition();
   const { showToast } = useToast();
 
-  const handleAdd = (data: AddWoodFormData) => {
+  const { handleEdit: onEdit, pending: pendingEdit } = useWoodEdit(
+    editingWood?.id ?? "",
+    () => setEditingWood(null)
+  );
+
+  const { handleDelete, pending: deletePending } = useWoodDelete();
+
+  const handleAdd = (data: WoodFormData) => {
     startAdd(async () => {
       try {
         await addWoodAction({
@@ -45,56 +46,6 @@ export function WoodsContent({ woods }: Props) {
           description: error instanceof Error ? error.message : "不明なエラー",
           variant: "error",
         });
-      }
-    });
-  };
-
-  const handleEdit = (data: AddWoodFormData) => {
-    if (!editingWood) return;
-    startEdit(async () => {
-      try {
-        await updateWoodAction({
-          id: editingWood.id,
-          name: data.name,
-          imageUrl: data.imageUrl,
-          features: data.features,
-        });
-        setEditingWood(null);
-        showToast({
-          title: "木材を更新しました",
-          description: data.name,
-          variant: "success",
-        });
-      } catch (error) {
-        showToast({
-          title: "木材の更新に失敗しました",
-          description: error instanceof Error ? error.message : "不明なエラー",
-          variant: "error",
-        });
-      }
-    });
-  };
-
-  const handleDelete = (id: string, name: string) => {
-    if (!window.confirm(`「${name}」を削除しますか？`)) return;
-
-    setDeletingId(id);
-    startDelete(async () => {
-      try {
-        await deleteWoodAction(id);
-        showToast({
-          title: "木材を削除しました",
-          description: name,
-          variant: "info",
-        });
-      } catch (error) {
-        showToast({
-          title: "木材の削除に失敗しました",
-          description: error instanceof Error ? error.message : "不明なエラー",
-          variant: "error",
-        });
-      } finally {
-        setDeletingId(null);
       }
     });
   };
@@ -169,7 +120,7 @@ export function WoodsContent({ woods }: Props) {
                     <button
                       type="button"
                       onClick={() => handleDelete(wood.id, wood.name)}
-                      disabled={deletingId === wood.id}
+                      disabled={deletePending}
                       className="rounded-md p-1 text-muted-foreground opacity-0 transition hover:bg-muted hover:text-destructive group-hover:opacity-100 disabled:opacity-60"
                       title="削除"
                     >
@@ -189,7 +140,7 @@ export function WoodsContent({ woods }: Props) {
       )}
 
       {showAddModal && (
-        <AddWoodModal
+        <WoodFormModal
           pending={pendingAdd}
           onSubmit={handleAdd}
           onClose={() => setShowAddModal(false)}
@@ -197,9 +148,9 @@ export function WoodsContent({ woods }: Props) {
       )}
 
       {editingWood && (
-        <AddWoodModal
+        <WoodFormModal
           pending={pendingEdit}
-          onSubmit={handleEdit}
+          onSubmit={onEdit}
           onClose={() => setEditingWood(null)}
           initialData={{
             name: editingWood.name,

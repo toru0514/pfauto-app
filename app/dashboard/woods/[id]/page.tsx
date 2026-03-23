@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { getWoods } from "../actions";
+import { getWoodById } from "../actions";
 import { WoodDetail } from "@/components/woods/wood-detail";
 
 export const dynamic = "force-dynamic";
@@ -10,9 +10,7 @@ type Props = {
 
 export default async function WoodDetailPage({ params }: Props) {
   const { id } = await params;
-  const decodedId = decodeURIComponent(id);
-  const woods = await getWoods();
-  const wood = woods.find((w) => w.id === decodedId);
+  const wood = await getWoodById(id);
 
   if (!wood) {
     notFound();
