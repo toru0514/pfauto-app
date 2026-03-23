@@ -38,6 +38,8 @@ export async function addWoodAction(input: {
   });
 
   revalidatePath("/dashboard/woods");
+  revalidatePath("/dashboard");
+  revalidatePath("/");
   return result;
 }
 
@@ -48,4 +50,6 @@ export async function deleteWoodAction(woodId: string): Promise<void> {
 
   await deleteWood(woodId);
   revalidatePath("/dashboard/woods");
+  revalidatePath("/dashboard");
+  revalidatePath("/");
 }

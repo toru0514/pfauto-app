@@ -17,7 +17,8 @@ type Props = {
 export function WoodsContent({ woods }: Props) {
   const [showAddModal, setShowAddModal] = useState(false);
   const [pendingAdd, startAdd] = useTransition();
-  const [pendingDelete, startDelete] = useTransition();
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [, startDelete] = useTransition();
   const { showToast } = useToast();
 
   const handleAdd = (data: AddWoodFormData) => {
@@ -45,6 +46,9 @@ export function WoodsContent({ woods }: Props) {
   };
 
   const handleDelete = (id: string, name: string) => {
+    if (!window.confirm(`「${name}」を削除しますか？`)) return;
+
+    setDeletingId(id);
     startDelete(async () => {
       try {
         await deleteWoodAction(id);
@@ -59,6 +63,8 @@ export function WoodsContent({ woods }: Props) {
           description: error instanceof Error ? error.message : "不明なエラー",
           variant: "error",
         });
+      } finally {
+        setDeletingId(null);
       }
     });
   };
@@ -119,7 +125,7 @@ export function WoodsContent({ woods }: Props) {
                   <button
                     type="button"
                     onClick={() => handleDelete(wood.id, wood.name)}
-                    disabled={pendingDelete}
+                    disabled={deletingId === wood.id}
                     className="shrink-0 rounded-md p-1 text-muted-foreground opacity-0 transition hover:bg-muted hover:text-destructive group-hover:opacity-100 disabled:opacity-60"
                     title="削除"
                   >
