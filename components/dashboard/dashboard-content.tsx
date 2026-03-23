@@ -182,7 +182,7 @@ export function DashboardContent({ products, jobs, spreadsheetUrl }: Props) {
             スプレッドシートの同期状態と自動化ジョブの状況を確認できます。
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {spreadsheetUrl && (
             <a
               href={spreadsheetUrl}
@@ -191,7 +191,8 @@ export function DashboardContent({ products, jobs, spreadsheetUrl }: Props) {
               className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-3 py-2 text-sm font-semibold text-foreground transition hover:bg-muted"
             >
               <ExternalLink className="h-4 w-4" />
-              スプレッドシートを開く
+              <span className="hidden sm:inline">スプレッドシートを開く</span>
+              <span className="sm:hidden">シート</span>
             </a>
           )}
           <button
@@ -216,7 +217,99 @@ export function DashboardContent({ products, jobs, spreadsheetUrl }: Props) {
         <div className="border-b border-border bg-muted/50 px-4 py-2 text-sm font-semibold text-muted-foreground">
           商品一覧
         </div>
-        <div className="overflow-x-auto">
+
+        {/* Mobile card list */}
+        <div className="divide-y divide-border md:hidden">
+          {products.map((product) => (
+            <div
+              key={product.id}
+              className="space-y-3 p-4"
+            >
+              <div
+                className="flex items-center gap-3 cursor-pointer"
+                onClick={() => router.push(`/dashboard/products/${encodeURIComponent(product.id)}`)}
+              >
+                {product.imageUrl ? (
+                  <ProductThumbnail url={product.imageUrl} />
+                ) : (
+                  <NoImagePlaceholder />
+                )}
+                <div className="min-w-0 flex-1">
+                  <div className="truncate font-medium text-foreground">{product.title}</div>
+                  <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                    <StatusBadge status={product.status} />
+                    <PlatformBadges values={product.platforms} />
+                  </div>
+                </div>
+              </div>
+              {product.lastError && (
+                <p className="text-xs text-destructive">{product.lastError}</p>
+              )}
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  className="rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground transition hover:bg-muted"
+                  onClick={() => router.push(`/dashboard/products/${encodeURIComponent(product.id)}`)}
+                >
+                  <Pencil className="inline h-3 w-3 mr-1" />
+                  編集
+                </button>
+                <button
+                  className="rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground transition hover:bg-muted"
+                  onClick={() => setCopyingProductId(product.id)}
+                >
+                  <Copy className="inline h-3 w-3 mr-1" />
+                  コピー
+                </button>
+                <button
+                  className="rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground transition hover:bg-muted"
+                  onClick={() => setSelectedProductId(product.id)}
+                >
+                  詳細
+                </button>
+                <button
+                  type="button"
+                  disabled={pendingEnqueue}
+                  onClick={() =>
+                    startEnqueue(async () => {
+                      try {
+                        await enqueueDraft(product.id, product.platforms);
+                        showToast({
+                          title: "送信キューに登録しました",
+                          description: `${product.title} (${renderPlatformsForToast(product.platforms)})`,
+                          variant: "success",
+                        });
+                        appendLog({
+                          type: "enqueue",
+                          status: "success",
+                          message: `${product.title} を送信キューに登録しました。`,
+                        });
+                      } catch (error) {
+                        const message = extractErrorMessage(error);
+                        showToast({
+                          title: "送信キュー登録に失敗しました",
+                          description: message,
+                          variant: "error",
+                        });
+                        appendLog({
+                          type: "enqueue",
+                          status: "error",
+                          message: `${product.title} の送信キュー登録に失敗しました。`,
+                          detail: message,
+                        });
+                      }
+                    })
+                  }
+                  className="rounded-md bg-secondary px-3 py-1.5 text-xs font-medium text-secondary-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {pendingEnqueue ? "送信中..." : "送信"}
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Desktop table */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="min-w-full divide-y divide-border text-sm">
             <thead className="bg-muted/30 text-muted-foreground">
               <tr>
@@ -452,7 +545,7 @@ function formatDate(value: string | null | undefined) {
 function DetailSheet({ product, onClose }: { product: DetailProduct; onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-      <div className="w-full max-w-lg overflow-hidden rounded-lg border border-border bg-card shadow-2xl">
+      <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-lg border border-border bg-card shadow-2xl">
         <div className="flex items-center justify-between border-b border-border bg-muted/50 px-4 py-3">
           <div>
             <h2 className="text-lg font-semibold text-foreground">{product.title}</h2>
@@ -568,43 +661,69 @@ function OperationLogSection({ logs }: { logs: OperationLogEntry[] }) {
           まだ操作履歴はありません。同期・送信を行うと最新20件がここに表示されます。
         </p>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-border text-sm">
-            <thead className="bg-muted/30 text-muted-foreground">
-              <tr>
-                <th className="px-4 py-3 text-left font-medium">時刻</th>
-                <th className="px-4 py-3 text-left font-medium">操作</th>
-                <th className="px-4 py-3 text-left font-medium">結果</th>
-                <th className="px-4 py-3 text-left font-medium">詳細</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {logs.map((log) => (
-                <tr key={log.id} className="bg-card">
-                  <td className="px-4 py-3 text-xs text-muted-foreground">{formatDate(new Date(log.createdAt).toISOString())}</td>
-                  <td className="px-4 py-3 text-sm text-foreground">{renderOperationLabel(log.type)}</td>
-                  <td className="px-4 py-3 text-sm">
-                    <span
-                      className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
-                        log.status === "success"
-                          ? "bg-emerald-100 text-emerald-700"
-                          : "bg-rose-100 text-rose-700"
-                      }`}
-                    >
-                      {log.status === "success" ? "成功" : "失敗"}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-sm text-muted-foreground">
-                    <p>{log.message}</p>
-                    {log.detail ? (
-                      <p className="text-xs text-foreground/60">{log.detail}</p>
-                    ) : null}
-                  </td>
+        <>
+          {/* Mobile card list */}
+          <div className="divide-y divide-border md:hidden">
+            {logs.map((log) => (
+              <div key={log.id} className="space-y-1 px-4 py-3">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-sm font-medium text-foreground">{renderOperationLabel(log.type)}</span>
+                  <span
+                    className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
+                      log.status === "success"
+                        ? "bg-emerald-100 text-emerald-700"
+                        : "bg-rose-100 text-rose-700"
+                    }`}
+                  >
+                    {log.status === "success" ? "成功" : "失敗"}
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground">{log.message}</p>
+                {log.detail && <p className="text-xs text-foreground/60">{log.detail}</p>}
+                <p className="text-xs text-muted-foreground">{formatDate(new Date(log.createdAt).toISOString())}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Desktop table */}
+          <div className="hidden md:block overflow-x-auto">
+            <table className="min-w-full divide-y divide-border text-sm">
+              <thead className="bg-muted/30 text-muted-foreground">
+                <tr>
+                  <th className="px-4 py-3 text-left font-medium">時刻</th>
+                  <th className="px-4 py-3 text-left font-medium">操作</th>
+                  <th className="px-4 py-3 text-left font-medium">結果</th>
+                  <th className="px-4 py-3 text-left font-medium">詳細</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {logs.map((log) => (
+                  <tr key={log.id} className="bg-card">
+                    <td className="px-4 py-3 text-xs text-muted-foreground">{formatDate(new Date(log.createdAt).toISOString())}</td>
+                    <td className="px-4 py-3 text-sm text-foreground">{renderOperationLabel(log.type)}</td>
+                    <td className="px-4 py-3 text-sm">
+                      <span
+                        className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
+                          log.status === "success"
+                            ? "bg-emerald-100 text-emerald-700"
+                            : "bg-rose-100 text-rose-700"
+                        }`}
+                      >
+                        {log.status === "success" ? "成功" : "失敗"}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-muted-foreground">
+                      <p>{log.message}</p>
+                      {log.detail ? (
+                        <p className="text-xs text-foreground/60">{log.detail}</p>
+                      ) : null}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
     </section>
   );
@@ -628,44 +747,65 @@ export function JobsContent({ jobs }: JobsContentProps) {
       </header>
 
       <section className="overflow-hidden rounded-lg border border-border bg-card shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-border text-sm">
-            <thead className="bg-muted/30 text-muted-foreground">
-              <tr>
-                <th className="px-4 py-3 text-left font-medium">ジョブID</th>
-                <th className="px-4 py-3 text-left font-medium">商品</th>
-                <th className="px-4 py-3 text-left font-medium">プラットフォーム</th>
-                <th className="px-4 py-3 text-left font-medium">ステータス</th>
-                <th className="px-4 py-3 text-left font-medium">試行</th>
-                <th className="px-4 py-3 text-left font-medium">開始時刻</th>
-                <th className="px-4 py-3 text-left font-medium">所要時間</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {jobs.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-sm text-muted-foreground">
-                    ジョブはまだありません。
-                  </td>
-                </tr>
-              ) : (
-                jobs.map((job) => (
-                  <tr key={job.id} className="bg-card">
-                    <td className="px-4 py-3 font-medium text-foreground">{job.id}</td>
-                    <td className="px-4 py-3 text-sm text-muted-foreground">{job.productId}</td>
-                    <td className="px-4 py-3"><PlatformBadges values={[job.platform]} /></td>
-                    <td className="px-4 py-3"><JobStatusBadge status={job.status} /></td>
-                    <td className="px-4 py-3 text-sm text-muted-foreground">{job.attempt ?? "-"}</td>
-                    <td className="px-4 py-3 text-sm text-muted-foreground">{formatDate(job.startedAt)}</td>
-                    <td className="px-4 py-3 text-sm text-muted-foreground">
-                      {job.durationSeconds ? `${job.durationSeconds}s` : "-"}
-                    </td>
+        {jobs.length === 0 ? (
+          <p className="px-4 py-8 text-center text-sm text-muted-foreground">
+            ジョブはまだありません。
+          </p>
+        ) : (
+          <>
+            {/* Mobile card list */}
+            <div className="divide-y divide-border md:hidden">
+              {jobs.map((job) => (
+                <div key={job.id} className="space-y-2 px-4 py-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <PlatformBadges values={[job.platform]} />
+                      <JobStatusBadge status={job.status} />
+                    </div>
+                    <span className="text-xs text-muted-foreground">試行: {job.attempt ?? "-"}</span>
+                  </div>
+                  <p className="truncate text-sm font-medium text-foreground">{job.productId}</p>
+                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                    <span>{formatDate(job.startedAt)}</span>
+                    <span>{job.durationSeconds ? `${job.durationSeconds}s` : "-"}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Desktop table */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="min-w-full divide-y divide-border text-sm">
+                <thead className="bg-muted/30 text-muted-foreground">
+                  <tr>
+                    <th className="px-4 py-3 text-left font-medium">ジョブID</th>
+                    <th className="px-4 py-3 text-left font-medium">商品</th>
+                    <th className="px-4 py-3 text-left font-medium">プラットフォーム</th>
+                    <th className="px-4 py-3 text-left font-medium">ステータス</th>
+                    <th className="px-4 py-3 text-left font-medium">試行</th>
+                    <th className="px-4 py-3 text-left font-medium">開始時刻</th>
+                    <th className="px-4 py-3 text-left font-medium">所要時間</th>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {jobs.map((job) => (
+                    <tr key={job.id} className="bg-card">
+                      <td className="px-4 py-3 font-medium text-foreground">{job.id}</td>
+                      <td className="px-4 py-3 text-sm text-muted-foreground">{job.productId}</td>
+                      <td className="px-4 py-3"><PlatformBadges values={[job.platform]} /></td>
+                      <td className="px-4 py-3"><JobStatusBadge status={job.status} /></td>
+                      <td className="px-4 py-3 text-sm text-muted-foreground">{job.attempt ?? "-"}</td>
+                      <td className="px-4 py-3 text-sm text-muted-foreground">{formatDate(job.startedAt)}</td>
+                      <td className="px-4 py-3 text-sm text-muted-foreground">
+                        {job.durationSeconds ? `${job.durationSeconds}s` : "-"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
       </section>
     </div>
   );

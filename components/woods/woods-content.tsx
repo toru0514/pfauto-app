@@ -112,7 +112,7 @@ export function WoodsContent({ woods }: Props) {
                     <button
                       type="button"
                       onClick={() => setEditingWood(wood)}
-                      className="rounded-md p-1 text-muted-foreground opacity-0 transition hover:bg-muted hover:text-foreground group-hover:opacity-100"
+                      className="rounded-md p-1 text-muted-foreground transition hover:bg-muted hover:text-foreground md:opacity-0 md:group-hover:opacity-100"
                       title="編集"
                     >
                       <Pencil className="h-4 w-4" />
@@ -121,7 +121,7 @@ export function WoodsContent({ woods }: Props) {
                       type="button"
                       onClick={() => handleDelete(wood.id, wood.name)}
                       disabled={deletePending}
-                      className="rounded-md p-1 text-muted-foreground opacity-0 transition hover:bg-muted hover:text-destructive group-hover:opacity-100 disabled:opacity-60"
+                      className="rounded-md p-1 text-muted-foreground transition hover:bg-muted hover:text-destructive md:opacity-0 md:group-hover:opacity-100 disabled:opacity-60"
                       title="削除"
                     >
                       <Trash2 className="h-4 w-4" />

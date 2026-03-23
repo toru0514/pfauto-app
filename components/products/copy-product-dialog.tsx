@@ -33,7 +33,7 @@ export function CopyProductDialog({ sourceProductId, sourceProductTitle, onClose
         if (e.target === e.currentTarget && !pending) onClose();
       }}
     >
-      <div className="w-full max-w-md overflow-hidden rounded-lg border border-border bg-card shadow-2xl">
+      <div className="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-lg border border-border bg-card shadow-2xl">
         <div className="flex items-center justify-between border-b border-border bg-muted/50 px-4 py-3">
           <h2 className="text-lg font-semibold text-foreground">商品をコピー</h2>
           <button

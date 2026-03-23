@@ -98,7 +98,7 @@ export function ImagePickerDialog({ currentUrls, onConfirm, onClose }: Props) {
           {loading ? (
             <p className="text-sm text-muted-foreground">読み込み中...</p>
           ) : (
-            <div className="grid grid-cols-4 gap-3 sm:grid-cols-5">
+            <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5">
               {images.map((img) => {
                 const isSelected = selectedUrls.has(img.url);
                 return (
@@ -131,7 +131,7 @@ export function ImagePickerDialog({ currentUrls, onConfirm, onClose }: Props) {
         </div>
 
         {/* Pagination + Confirm */}
-        <div className="flex items-center justify-between border-t border-border px-4 py-3">
+        <div className="flex flex-col gap-3 border-t border-border px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-2">
             <button
               type="button"
