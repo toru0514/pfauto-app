@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import Link from "next/link";
 import { Trash2, Pencil } from "lucide-react";
 import { AddWoodModal, type AddWoodFormData } from "./add-wood-modal";
 import {
@@ -129,28 +130,33 @@ export function WoodsContent({ woods }: Props) {
               key={wood.id}
               className="group overflow-hidden rounded-lg border border-border bg-card shadow-sm transition hover:shadow-md"
             >
-              {wood.imageUrl ? (
-                <div className="aspect-[4/3] overflow-hidden bg-muted">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={wood.imageUrl}
-                    alt={wood.name}
-                    className="h-full w-full object-cover"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).style.display = "none";
-                    }}
-                  />
-                </div>
-              ) : (
-                <div className="flex aspect-[4/3] items-center justify-center bg-muted">
-                  <span className="text-xs text-muted-foreground">画像なし</span>
-                </div>
-              )}
+              <Link href={`/dashboard/woods/${encodeURIComponent(wood.id)}`}>
+                {wood.imageUrl ? (
+                  <div className="aspect-[4/3] overflow-hidden bg-muted">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={wood.imageUrl}
+                      alt={wood.name}
+                      className="h-full w-full object-cover"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = "none";
+                      }}
+                    />
+                  </div>
+                ) : (
+                  <div className="flex aspect-[4/3] items-center justify-center bg-muted">
+                    <span className="text-xs text-muted-foreground">画像なし</span>
+                  </div>
+                )}
+              </Link>
               <div className="p-4">
                 <div className="flex items-start justify-between gap-2">
-                  <h3 className="text-base font-semibold text-foreground">
+                  <Link
+                    href={`/dashboard/woods/${encodeURIComponent(wood.id)}`}
+                    className="text-base font-semibold text-foreground hover:underline"
+                  >
                     {wood.name}
-                  </h3>
+                  </Link>
                   <div className="flex shrink-0 gap-1">
                     <button
                       type="button"
@@ -172,7 +178,7 @@ export function WoodsContent({ woods }: Props) {
                   </div>
                 </div>
                 {wood.features && (
-                  <p className="mt-2 text-sm leading-relaxed text-muted-foreground whitespace-pre-wrap">
+                  <p className="mt-2 text-sm leading-relaxed text-muted-foreground whitespace-pre-wrap line-clamp-3">
                     {wood.features}
                   </p>
                 )}
