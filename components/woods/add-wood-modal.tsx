@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { ImagePlus } from "lucide-react";
+import { ImagePickerDialog } from "@/components/products/image-picker-dialog";
 
 export type AddWoodFormData = {
   name: string;
@@ -12,13 +14,16 @@ type Props = {
   pending: boolean;
   onSubmit: (data: AddWoodFormData) => void;
   onClose: () => void;
+  initialData?: AddWoodFormData;
 };
 
-export function AddWoodModal({ pending, onSubmit, onClose }: Props) {
-  const [name, setName] = useState("");
-  const [imageUrl, setImageUrl] = useState("");
-  const [features, setFeatures] = useState("");
+export function AddWoodModal({ pending, onSubmit, onClose, initialData }: Props) {
+  const [name, setName] = useState(initialData?.name ?? "");
+  const [imageUrl, setImageUrl] = useState(initialData?.imageUrl ?? "");
+  const [features, setFeatures] = useState(initialData?.features ?? "");
+  const [showImagePicker, setShowImagePicker] = useState(false);
 
+  const isEdit = !!initialData;
   const canSubmit = !pending && name.trim().length > 0;
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -40,7 +45,9 @@ export function AddWoodModal({ pending, onSubmit, onClose }: Props) {
     >
       <div className="w-full max-w-lg overflow-hidden rounded-lg border border-border bg-card shadow-2xl">
         <div className="flex items-center justify-between border-b border-border bg-muted/50 px-4 py-3">
-          <h2 className="text-lg font-semibold text-foreground">木材を追加</h2>
+          <h2 className="text-lg font-semibold text-foreground">
+            {isEdit ? "木材を編集" : "木材を追加"}
+          </h2>
           <button
             type="button"
             onClick={onClose}
@@ -70,14 +77,25 @@ export function AddWoodModal({ pending, onSubmit, onClose }: Props) {
             <label className="block text-xs font-medium text-muted-foreground mb-1">
               画像URL
             </label>
-            <input
-              type="url"
-              value={imageUrl}
-              onChange={(e) => setImageUrl(e.target.value)}
-              placeholder="https://example.com/image.jpg"
-              disabled={pending}
-              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 disabled:opacity-60"
-            />
+            <div className="flex gap-2">
+              <input
+                type="url"
+                value={imageUrl}
+                onChange={(e) => setImageUrl(e.target.value)}
+                placeholder="https://example.com/image.jpg"
+                disabled={pending}
+                className="flex-1 rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 disabled:opacity-60"
+              />
+              <button
+                type="button"
+                onClick={() => setShowImagePicker(true)}
+                disabled={pending}
+                className="flex shrink-0 items-center gap-1.5 rounded-md border border-border px-3 py-2 text-xs font-medium text-muted-foreground transition hover:bg-muted disabled:opacity-60"
+              >
+                <ImagePlus className="h-4 w-4" />
+                microCMS
+              </button>
+            </div>
             {imageUrl.trim() && (
               <div className="mt-2 overflow-hidden rounded-md border border-border">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -121,11 +139,30 @@ export function AddWoodModal({ pending, onSubmit, onClose }: Props) {
               disabled={!canSubmit}
               className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {pending ? "追加中..." : "追加する"}
+              {pending
+                ? isEdit
+                  ? "更新中..."
+                  : "追加中..."
+                : isEdit
+                  ? "更新する"
+                  : "追加する"}
             </button>
           </div>
         </form>
       </div>
+
+      {showImagePicker && (
+        <ImagePickerDialog
+          currentUrls={imageUrl.trim() ? [imageUrl.trim()] : []}
+          onConfirm={(urls) => {
+            if (urls.length > 0) {
+              setImageUrl(urls[urls.length - 1]);
+            }
+            setShowImagePicker(false);
+          }}
+          onClose={() => setShowImagePicker(false)}
+        />
+      )}
     </div>
   );
 }

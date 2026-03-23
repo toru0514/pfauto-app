@@ -156,6 +156,70 @@ export async function addWood(input: {
   }
 }
 
+export async function updateWood(
+  woodId: string,
+  input: { name: string; imageUrl: string; features: string }
+): Promise<WoodMaterial> {
+  await ensureWoodSheet();
+
+  try {
+    await rateLimiter.acquire();
+    const sheets = getSheetsClient();
+    const spreadsheetId = getSpreadsheetId();
+
+    const { data } = await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: `${WOOD_SHEET_TITLE}!A1:ZZ`,
+      majorDimension: "ROWS",
+    });
+
+    const values = data.values ?? [];
+    if (values.length <= 1) throw new Error("木材が見つかりません。");
+
+    const [headerRow, ...rows] = values;
+    const idIdx = headerRow.indexOf("id");
+    const nameIdx = headerRow.indexOf("name");
+    const imageUrlIdx = headerRow.indexOf("image_url");
+    const featuresIdx = headerRow.indexOf("features");
+    const createdAtIdx = headerRow.indexOf("created_at");
+
+    const targetRowIndex = rows.findIndex((row) => row[idIdx] === woodId);
+    if (targetRowIndex === -1) throw new Error("木材が見つかりません。");
+
+    const row = rows[targetRowIndex];
+    const updatedRow = [...row];
+    updatedRow[nameIdx] = input.name;
+    updatedRow[imageUrlIdx] = input.imageUrl;
+    updatedRow[featuresIdx] = input.features;
+
+    // ヘッダー行の分 +2 (1-indexed)
+    const sheetRowIndex = targetRowIndex + 2;
+    await rateLimiter.acquire();
+    await sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range: `${WOOD_SHEET_TITLE}!A${sheetRowIndex}`,
+      valueInputOption: "RAW",
+      requestBody: {
+        values: [updatedRow],
+      },
+    });
+
+    const updated: WoodMaterial = {
+      id: woodId,
+      name: input.name,
+      imageUrl: input.imageUrl,
+      features: input.features,
+      createdAt: row[createdAtIdx] ?? "",
+    };
+
+    log.info("木材を更新しました", { id: woodId, name: input.name });
+    return updated;
+  } catch (error) {
+    log.error("木材の更新に失敗しました", error, { woodId });
+    throw error;
+  }
+}
+
 export async function deleteWood(woodId: string): Promise<void> {
   await ensureWoodSheet();
 

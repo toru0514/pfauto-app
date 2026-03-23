@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Trash2 } from "lucide-react";
+import { Trash2, Pencil } from "lucide-react";
 import { AddWoodModal, type AddWoodFormData } from "./add-wood-modal";
 import {
   addWoodAction,
+  updateWoodAction,
   deleteWoodAction,
 } from "@/app/dashboard/woods/actions";
 import type { WoodMaterial } from "@/adapters/google-sheets/wood-repository";
@@ -16,7 +17,9 @@ type Props = {
 
 export function WoodsContent({ woods }: Props) {
   const [showAddModal, setShowAddModal] = useState(false);
+  const [editingWood, setEditingWood] = useState<WoodMaterial | null>(null);
   const [pendingAdd, startAdd] = useTransition();
+  const [pendingEdit, startEdit] = useTransition();
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [, startDelete] = useTransition();
   const { showToast } = useToast();
@@ -38,6 +41,32 @@ export function WoodsContent({ woods }: Props) {
       } catch (error) {
         showToast({
           title: "木材の追加に失敗しました",
+          description: error instanceof Error ? error.message : "不明なエラー",
+          variant: "error",
+        });
+      }
+    });
+  };
+
+  const handleEdit = (data: AddWoodFormData) => {
+    if (!editingWood) return;
+    startEdit(async () => {
+      try {
+        await updateWoodAction({
+          id: editingWood.id,
+          name: data.name,
+          imageUrl: data.imageUrl,
+          features: data.features,
+        });
+        setEditingWood(null);
+        showToast({
+          title: "木材を更新しました",
+          description: data.name,
+          variant: "success",
+        });
+      } catch (error) {
+        showToast({
+          title: "木材の更新に失敗しました",
           description: error instanceof Error ? error.message : "不明なエラー",
           variant: "error",
         });
@@ -122,15 +151,25 @@ export function WoodsContent({ woods }: Props) {
                   <h3 className="text-base font-semibold text-foreground">
                     {wood.name}
                   </h3>
-                  <button
-                    type="button"
-                    onClick={() => handleDelete(wood.id, wood.name)}
-                    disabled={deletingId === wood.id}
-                    className="shrink-0 rounded-md p-1 text-muted-foreground opacity-0 transition hover:bg-muted hover:text-destructive group-hover:opacity-100 disabled:opacity-60"
-                    title="削除"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
+                  <div className="flex shrink-0 gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setEditingWood(wood)}
+                      className="rounded-md p-1 text-muted-foreground opacity-0 transition hover:bg-muted hover:text-foreground group-hover:opacity-100"
+                      title="編集"
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(wood.id, wood.name)}
+                      disabled={deletingId === wood.id}
+                      className="rounded-md p-1 text-muted-foreground opacity-0 transition hover:bg-muted hover:text-destructive group-hover:opacity-100 disabled:opacity-60"
+                      title="削除"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
                 </div>
                 {wood.features && (
                   <p className="mt-2 text-sm leading-relaxed text-muted-foreground whitespace-pre-wrap">
@@ -148,6 +187,19 @@ export function WoodsContent({ woods }: Props) {
           pending={pendingAdd}
           onSubmit={handleAdd}
           onClose={() => setShowAddModal(false)}
+        />
+      )}
+
+      {editingWood && (
+        <AddWoodModal
+          pending={pendingEdit}
+          onSubmit={handleEdit}
+          onClose={() => setEditingWood(null)}
+          initialData={{
+            name: editingWood.name,
+            imageUrl: editingWood.imageUrl,
+            features: editingWood.features,
+          }}
         />
       )}
     </div>

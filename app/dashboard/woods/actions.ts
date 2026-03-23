@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import {
   listWoods,
   addWood,
+  updateWood,
   deleteWood,
 } from "@/adapters/google-sheets/wood-repository";
 import type { WoodMaterial } from "@/adapters/google-sheets/wood-repository";
@@ -32,6 +33,43 @@ export async function addWoodAction(input: {
   }
 
   const result = await addWood({
+    name: input.name.trim(),
+    imageUrl: input.imageUrl.trim(),
+    features: input.features.trim(),
+  });
+
+  revalidatePath("/dashboard/woods");
+  revalidatePath("/dashboard");
+  revalidatePath("/");
+  return result;
+}
+
+export async function updateWoodAction(input: {
+  id: string;
+  name: string;
+  imageUrl: string;
+  features: string;
+}): Promise<WoodMaterial> {
+  if (
+    typeof input !== "object" ||
+    input === null ||
+    typeof input.id !== "string" ||
+    typeof input.name !== "string" ||
+    typeof input.imageUrl !== "string" ||
+    typeof input.features !== "string"
+  ) {
+    throw new Error("不正な入力です。");
+  }
+
+  if (!input.id.trim()) {
+    throw new Error("木材IDは必須です。");
+  }
+
+  if (!input.name.trim()) {
+    throw new Error("木材名は必須です。");
+  }
+
+  const result = await updateWood(input.id, {
     name: input.name.trim(),
     imageUrl: input.imageUrl.trim(),
     features: input.features.trim(),
