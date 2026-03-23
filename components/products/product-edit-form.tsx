@@ -110,7 +110,7 @@ export function ProductEditForm({ productId }: Props) {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
           <button
             type="button"
@@ -223,8 +223,8 @@ export function ProductEditForm({ productId }: Props) {
 
       {/* Bottom save bar */}
       {!loading && raw && hasChanges && (
-        <div className="sticky bottom-0 flex items-center justify-end gap-2 rounded-lg border border-border bg-card px-4 py-3 shadow-lg">
-          <span className="mr-auto text-sm text-muted-foreground">
+        <div className="sticky bottom-0 flex flex-col gap-2 rounded-lg border border-border bg-card px-4 py-3 shadow-lg sm:flex-row sm:items-center sm:justify-end">
+          <span className="text-sm text-muted-foreground sm:mr-auto">
             未保存の変更があります
           </span>
           <button

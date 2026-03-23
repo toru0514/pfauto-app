@@ -65,7 +65,7 @@ function ToastViewport({ toasts }: { toasts: Toast[] }) {
   if (!toasts.length) return null;
 
   return (
-    <div className="fixed top-6 right-6 z-[9999] flex w-full max-w-sm flex-col gap-3">
+    <div className="fixed top-16 right-4 left-4 z-[9999] mx-auto flex max-w-sm flex-col gap-3 md:top-6 md:right-6 md:left-auto md:mx-0">
       {toasts.map((toast) => (
         <div
           key={toast.id}
