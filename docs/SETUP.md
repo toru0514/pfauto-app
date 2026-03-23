@@ -159,3 +159,31 @@ ADMIN_PASSWORD_HASH does not appear to be a valid bcrypt hash
 ### Google Sheets API エラー
 
 → サービスアカウントにスプレッドシートへの編集権限が付与されているか確認してください。
+
+## NEXTAUTH_SECRET のローテーション手順
+
+セッション有効期間は30日間に設定されています。不正アクセスの疑いがある場合など、**全ユーザーのセッションを即座に無効化**するには `NEXTAUTH_SECRET` をローテーションしてください。
+
+### 手順
+
+1. 新しいシークレットを生成
+
+```bash
+openssl rand -base64 32
+```
+
+2. Vercel の環境変数を更新
+
+```bash
+# Vercel ダッシュボード > Settings > Environment Variables で
+# NEXTAUTH_SECRET の値を新しいシークレットに変更
+```
+
+3. 再デプロイ
+
+```bash
+# Vercel ダッシュボードから手動でデプロイ、または
+git commit --allow-empty -m "rotate NEXTAUTH_SECRET" && git push
+```
+
+ローテーション完了後、既存のJWTトークンはすべて無効になり、全ユーザーが再ログインを求められます。
