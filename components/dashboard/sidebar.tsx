@@ -9,7 +9,7 @@ const NAV_ITEMS = [
   { href: "/dashboard/jobs", label: "ジョブ一覧", icon: Briefcase },
   { href: "/dashboard/images/upload", label: "画像追加", icon: ImagePlus },
   { href: "/dashboard/woods", label: "木材一覧", icon: TreePine },
-];
+] as const;
 
 export function Sidebar({ spreadsheetUrl }: { spreadsheetUrl: string | null }) {
   const pathname = usePathname();
