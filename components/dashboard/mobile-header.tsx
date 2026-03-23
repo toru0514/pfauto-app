@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { Menu, X, Package, Briefcase, ImagePlus, TreePine, ExternalLink } from "lucide-react";
@@ -15,10 +15,14 @@ const NAV_ITEMS = [
 export function MobileHeader({ spreadsheetUrl }: { spreadsheetUrl: string | null }) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
+  const prevPathname = useRef(pathname);
 
-  useEffect(() => {
-    setOpen(false);
-  }, [pathname]);
+  if (prevPathname.current !== pathname) {
+    prevPathname.current = pathname;
+    if (open) {
+      setOpen(false);
+    }
+  }
 
   useEffect(() => {
     if (open) {
