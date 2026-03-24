@@ -2,7 +2,6 @@
 
 import { useSearchParams, useRouter } from "next/navigation";
 import { useState, FormEvent, Suspense } from "react";
-import { signIn } from "next-auth/react";
 
 function LoginForm() {
   const searchParams = useSearchParams();
@@ -19,14 +18,13 @@ function LoginForm() {
     setIsSubmitting(true);
     setError(null);
 
-    const result = await signIn("credentials", {
-      email,
-      password,
-      redirect: false,
-      callbackUrl,
+    const res = await fetch("/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
     });
 
-    if (result?.error) {
+    if (!res.ok) {
       setError("メールアドレスまたはパスワードが正しくありません。");
       setIsSubmitting(false);
       return;
