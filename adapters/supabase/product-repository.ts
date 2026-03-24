@@ -89,10 +89,6 @@ export async function upsertProducts(
       log.warn("商品バッチの DB 保存に失敗しました", {
         batch: `${i}-${i + batch.length}`,
         error: error.message,
-        code: error.code,
-        details: error.details,
-        hint: error.hint,
-        sampleRow: JSON.stringify(batch[0]),
       });
       errors += batch.length;
     } else {
