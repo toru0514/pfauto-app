@@ -50,3 +50,4 @@ service-account.json
 
 # IDE
 .idea/
+.env*.local

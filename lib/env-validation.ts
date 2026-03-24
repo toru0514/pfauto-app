@@ -16,13 +16,13 @@ const ENV_VARS: EnvVarConfig[] = [
   },
   {
     name: "ADMIN_EMAIL",
-    required: true,
-    description: "Admin user email address",
+    required: false, // DB認証に移行した場合は不要
+    description: "Admin user email address (fallback for DB auth)",
   },
   {
     name: "ADMIN_PASSWORD_HASH",
-    required: true,
-    description: "Bcrypt hash of admin password",
+    required: false, // DB認証に移行した場合は不要
+    description: "Bcrypt hash of admin password (fallback for DB auth)",
   },
   {
     name: "GOOGLE_SERVICE_ACCOUNT_BASE64",
@@ -33,6 +33,16 @@ const ENV_VARS: EnvVarConfig[] = [
     name: "GOOGLE_SHEETS_SPREADSHEET_ID",
     required: false, // Not required if using mock data
     description: "Google Sheets spreadsheet ID",
+  },
+  {
+    name: "SUPABASE_URL",
+    required: false, // Supabase未導入環境でも動作可能
+    description: "Supabase project URL",
+  },
+  {
+    name: "SUPABASE_SERVICE_ROLE_KEY",
+    required: false, // Supabase未導入環境でも動作可能
+    description: "Supabase service role key",
   },
 ];
 
@@ -63,6 +73,15 @@ export function validateEnv(): ValidationResult {
         missing.push(config.name);
       }
     }
+  }
+
+  // 認証ソースの確認: DBかenv変数のどちらかが必要
+  const hasDbAuth = process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const hasEnvAuth = process.env.ADMIN_EMAIL && process.env.ADMIN_PASSWORD_HASH;
+  if (!hasDbAuth && !hasEnvAuth) {
+    warnings.push(
+      "認証情報が未設定です。SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY、または ADMIN_EMAIL + ADMIN_PASSWORD_HASH のどちらかを設定してください"
+    );
   }
 
   // Validate ADMIN_PASSWORD_HASH format
