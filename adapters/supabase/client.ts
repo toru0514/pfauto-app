@@ -12,12 +12,12 @@ let cachedClient: SupabaseClient | null = null;
 export function getSupabaseClient(): SupabaseClient | null {
   if (cachedClient) return cachedClient;
 
-  const url = process.env.SUPABASE_URL;
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
   if (!url || !serviceRoleKey) {
     log.warn(
-      "SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY が未設定のため、Supabase は無効です"
+      "NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY が未設定のため、Supabase は無効です"
     );
     return null;
   }
