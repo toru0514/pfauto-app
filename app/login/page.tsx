@@ -2,7 +2,14 @@
 
 import { useSearchParams, useRouter } from "next/navigation";
 import { useState, FormEvent, Suspense } from "react";
-import { signIn } from "next-auth/react";
+import { createClient } from "@supabase/supabase-js";
+
+function getSupabaseAuthClient() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
+}
 
 function LoginForm() {
   const searchParams = useSearchParams();
@@ -19,18 +26,19 @@ function LoginForm() {
     setIsSubmitting(true);
     setError(null);
 
-    const result = await signIn("credentials", {
-      email,
-      password,
-      redirect: false,
-      callbackUrl,
-    });
+    const supabase = getSupabaseAuthClient();
+    const { data, error: authError } =
+      await supabase.auth.signInWithPassword({ email, password });
 
-    if (result?.error) {
+    if (authError || !data.session) {
       setError("メールアドレスまたはパスワードが正しくありません。");
       setIsSubmitting(false);
       return;
     }
+
+    // アクセストークンとリフレッシュトークンをクッキーに保存
+    document.cookie = `sb-access-token=${data.session.access_token}; path=/; max-age=${60 * 60 * 24 * 30}; SameSite=Lax`;
+    document.cookie = `sb-refresh-token=${data.session.refresh_token}; path=/; max-age=${60 * 60 * 24 * 30}; SameSite=Lax`;
 
     router.replace(callbackUrl);
   }
